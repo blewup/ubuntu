@@ -14,7 +14,13 @@ set -euo pipefail
 UBUNTU_HOME="${HOME}/ubuntu"
 ROOTFS="${UBUNTU_HOME}/rootfs"
 LOG_DIR="${UBUNTU_HOME}/logs"
-
+--env HOME=/root
+--env USER=root
+--env TERM=xterm-256color
+--env LANG=en_US.UTF-8
+--env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+--env DISPLAY=:1
+--env PULSE_SERVER=127.0.0.1
 mkdir -p "${LOG_DIR}"
 
 # ============================================================================
@@ -39,13 +45,6 @@ PROOT_ARGS=(
     --bind="${UBUNTU_HOME}:/ubuntu"
     --bind=/data/data/com.termux/files/usr/tmp:/tmp
     --cwd=/root
-    --env=HOME=/root
-    --env=USER=root
-    --env=TERM=xterm-256color
-    --env=LANG=en_US.UTF-8
-    --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    --env=DISPLAY=:1
-    --env=PULSE_SERVER=127.0.0.1
 )
 
 # Add Android system paths if available (needed on some devices)
