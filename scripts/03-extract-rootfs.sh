@@ -897,44 +897,7 @@ verify_extraction() {
 
 main() {
     print_header "${SCRIPT_NAME}" "${SCRIPT_VERSION}"
-    
-    ensure_dir "${UBUNTU_LOGS}"
-    
-    log_info "Starting Ubuntu rootfs extraction..."
-    log_info "Log file: ${CURRENT_LOG_FILE}"
-    echo ""
-    
-    # Check if running in Termux
-    if ! is_termux; then
-        die "This script must be run in Termux"
-    fi
-    
-    # Find the tarball
-    local tarball
-    tarball=$(find_tarball)
-    
-    if [[ -z "${tarball}" ]]; then
-        exit 1
-    fi
-    
-    # Verify tarball
-    if ! verify_tarball "${tarball}"; then
-        die "Tarball verification failed"
-    fi
-    
-    # Check space
-    if ! check_space; then
-        die "Insufficient storage space"
-    fi
-    
-    # Prepare directory
-    prepare_rootfs_directory
-    
-    # Extract
-    if ! extract_rootfs "${tarball}"; then
-        die "Extraction failed"
-    fi
-    
+
     # Configure
     configure_rootfs_basic
     create_proot_fixes
