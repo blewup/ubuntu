@@ -56,8 +56,29 @@ check_rootfs() {
         exit 1
     fi
     
-    if [[ ! -f "${ROOTFS}/bin/bash" ]]; then
-        echo "Error: Invalid rootfs (no /bin/bash)"
+    # Check essential binaries exist
+    local essential_bins=(
+        "/bin/bash"
+        "/usr/bin/env"
+    )
+    local missing=()
+    
+    for bin in "${essential_bins[@]}"; do
+        if [[ ! -f "${ROOTFS}${bin}" ]]; then
+            missing+=("${bin}")
+        fi
+    done
+    
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        echo "Error: Ubuntu rootfs appears incomplete or corrupted"
+        echo "Missing essential binaries:"
+        for bin in "${missing[@]}"; do
+            echo "  - ${bin}"
+        done
+        echo ""
+        echo "The rootfs extraction may have failed. Please:"
+        echo "  1. Remove incomplete rootfs: rm -rf ${ROOTFS}"
+        echo "  2. Re-run extraction: bash ~/ubuntu/scripts/03-extract-rootfs.sh"
         exit 1
     fi
 }
