@@ -532,15 +532,17 @@ main() {
         die "PRoot environment is not ready. Run 04-configure-proot.sh first."
     fi
     
-    # Check if droid user is set up
+    # Check if droid user is set up in /etc/passwd first
+    if ! grep -q "^droid:" "${UBUNTU_ROOT}/etc/passwd" 2>/dev/null; then
+        die "Droid user is not set in /etc/passwd. Run 03-extract-rootfs.sh to configure the rootfs properly."
+    fi
+    
+    # Ensure droid user home directory exists
     if [[ ! -d "${UBUNTU_ROOT}/home/droid" ]]; then
         log_warn "Droid user home directory not found, creating..."
         mkdir -p "${UBUNTU_ROOT}/home/droid"
         chmod 755 "${UBUNTU_ROOT}/home/droid"
-    fi
-    
-    if ! grep -q "^droid:" "${UBUNTU_ROOT}/etc/passwd" 2>/dev/null; then
-        die "Droid user is not set in /etc/passwd. Run 03-extract-rootfs.sh to configure the rootfs properly."
+        chown 1000:1000 "${UBUNTU_ROOT}/home/droid" 2>/dev/null || true
     fi
     
     # Create installation script
