@@ -25,341 +25,10 @@ SCRIPT_NAME="Ubuntu Rootfs Extraction"
 SCRIPT_VERSION="1.0.0"
 CURRENT_LOG_FILE="${UBUNTU_LOGS}/03-extract-rootfs.log"
 
-# Tarball search locations
-TARBALL_NAMES=(
-    "resolute-base-arm64.tar.gz"
-    "ubuntu-base-26.04-base-arm64.tar.gz"
-    "ubuntu-base-*-arm64.tar.gz"
-)
-
-TARBALL_LOCATIONS=(
-    "${HOME}"
-    "${HOME}/ubuntu"
-    "${HOME}/ubuntu-fs"
-    "/sdcard/Download"
-    "/sdcard"
-    "/storage/emulated/0/Download"
-    "/storage/emulated/0"
-    "${HOME}/storage/downloads"
-    "${HOME}/storage/shared/Download"
-)
-
-# Minimum required space in MB
-MIN_SPACE_MB=8000
-
-# Download URL for Ubuntu 26.04 Resolute ARM64 base image
-ROOTFS_DOWNLOAD_URL="https://cdimage.ubuntu.com/ubuntu-base/daily/pending/resolute-base-arm64.tar.gz"
-ROOTFS_FILENAME="resolute-base-arm64.tar.gz"
-ROOTFS_DOWNLOAD_PATH="${HOME}/${ROOTFS_FILENAME}"
-
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
 
-download_rootfs() {
-    log_section "Downloading Ubuntu Rootfs"
-    
-    local target="${ROOTFS_DOWNLOAD_PATH}"
-    
-    log_info "Downloading Ubuntu 26.04 (Resolute) ARM64 base image..."
-    log_info "URL: ${ROOTFS_DOWNLOAD_URL}"
-    log_info "Target: ${target}"
-    echo ""
-    
-    # Check if curl or wget is available
-    if command_exists curl; then
-        log_info "Using curl for download..."
-        if curl -L --progress-bar -o "${target}" "${ROOTFS_DOWNLOAD_URL}"; then
-            local size
-            size=$(get_file_size_human "${target}")
-            log_success "Download complete! Size: ${size}"
-            echo "${target}"
-            return 0
-        else
-            log_error "Download failed with curl"
-            rm -f "${target}" 2>/dev/null
-            return 1
-        fi
-    elif command_exists wget; then
-        log_info "Using wget for download..."
-        if wget --progress=bar:force -O "${target}" "${ROOTFS_DOWNLOAD_URL}"; then
-            local size
-            size=$(get_file_size_human "${target}")
-            log_success "Download complete! Size: ${size}"
-            echo "${target}"
-            return 0
-        else
-            log_error "Download failed with wget"
-            rm -f "${target}" 2>/dev/null
-            return 1
-        fi
-    else
-        log_error "Neither curl nor wget is available"
-        log_info "Please install curl: pkg install curl"
-        return 1
-    fi
-}
-
-find_tarball() {
-    log_section "Locating Ubuntu Rootfs Tarball"
-    
-    local found=""
-    
-    for location in "${TARBALL_LOCATIONS[@]}"; do
-        if [[ ! -d "${location}" ]]; then
-            continue
-        fi
-        
-        for pattern in "${TARBALL_NAMES[@]}"; do
-            # Use find to handle wildcards
-            while IFS= read -r -d '' file; do
-                if [[ -f "${file}" ]]; then
-                    found="${file}"
-                    break 2
-                fi
-            done < <(find "${location}" -maxdepth 1 -name "${pattern}" -print0 2>/dev/null)
-        done
-        
-        [[ -n "${found}" ]] && break
-    done
-    
-    if [[ -n "${found}" ]]; then
-        local size
-        size=$(get_file_size_human "${found}")
-        log_success "Found tarball: ${found} (${size})"
-        echo "${found}"
-        return 0
-    else
-        log_warn "Ubuntu rootfs tarball not found locally"
-        echo ""
-        
-        # Offer to download automatically
-        if confirm "Would you like to download the rootfs automatically? (~34MB)" "y"; then
-            local downloaded
-            downloaded=$(download_rootfs)
-            if [[ -n "${downloaded}" ]] && [[ -f "${downloaded}" ]]; then
-                echo "${downloaded}"
-                return 0
-            else
-                log_error "Download failed"
-                return 1
-            fi
-        else
-            log_info "You can manually download the rootfs from:"
-            echo "  URL: ${ROOTFS_DOWNLOAD_URL}"
-            echo ""
-            echo "Or place a tarball in one of these locations:"
-            for loc in "${TARBALL_LOCATIONS[@]}"; do
-                echo "  - ${loc}/"
-            done
-            echo ""
-            return 1
-        fi
-    fi
-}
-
-verify_tarball() {
-    local tarball="$1"
-    
-    log_section "Verifying Tarball Integrity"
-    
-    log_step 1 3 "Checking file type..."
-    local file_type
-    file_type=$(file "${tarball}" 2>/dev/null || echo "unknown")
-    
-    if echo "${file_type}" | grep -qiE "gzip|tar|compressed"; then
-        log_success "File type: gzip compressed tar archive"
-    else
-        log_warn "File type: ${file_type}"
-        log_warn "Expected gzip tar archive - extraction may fail"
-    fi
-    
-    log_step 2 3 "Testing archive integrity..."
-    # On Android storage (FUSE/sdcardfs), gzip -t and direct tar tests may fail
-    # even for valid files due to filesystem limitations. Use multiple fallback methods.
-    local verification_passed=false
-    
-    # Method 1: Direct gzip test
-    if gzip -t "${tarball}" 2>/dev/null; then
-        log_success "Gzip integrity check passed"
-        verification_passed=true
-    else
-        log_info "Direct gzip test failed (common on Android storage filesystem)"
-    fi
-    
-    # Method 2: Try to list archive contents
-    if [[ "${verification_passed}" != "true" ]]; then
-        log_info "Attempting alternative verification by listing contents..."
-        if tar -tzf "${tarball}" 2>/dev/null | head -5 > /dev/null; then
-            log_success "Alternative verification passed - tarball appears readable"
-            verification_passed=true
-        else
-            log_info "tar list method failed, trying read test..."
-        fi
-    fi
-    
-    # Method 3: Try partial read test
-    if [[ "${verification_passed}" != "true" ]]; then
-        log_info "Attempting partial read verification..."
-        if dd if="${tarball}" bs=1024 count=100 2>/dev/null | gzip -t 2>/dev/null; then
-            log_success "Partial read verification passed"
-            verification_passed=true
-        else
-            log_info "Partial read test inconclusive"
-        fi
-    fi
-    
-    # Fail if no verification method passed
-    if [[ "${verification_passed}" != "true" ]]; then
-        local file_size
-        file_size=$(stat -c%s "${tarball}" 2>/dev/null || stat -f%z "${tarball}" 2>/dev/null || echo "0")
-        log_error "Tarball verification failed: file appears to be corrupted"
-        log_error "  Current file size: ${file_size} bytes"
-        log_info "The tarball may have been incompletely downloaded or corrupted."
-        log_info "Please try re-downloading the rootfs tarball."
-        return 1
-    fi
-    
-    log_step 3 3 "Checking archive contents..."
-    local has_usr=false
-    local has_etc=false
-    local has_bin=false
-    
-    # Try to check contents, but don't fail if listing doesn't work
-    local content_check
-    content_check=$(tar -tzf "${tarball}" 2>/dev/null | head -200 || echo "")
-    
-    if [[ -n "${content_check}" ]]; then
-        echo "${content_check}" | grep -q "^usr/" && has_usr=true
-        echo "${content_check}" | grep -q "^etc/" && has_etc=true
-        echo "${content_check}" | grep -qE "^(bin/|usr/bin/)" && has_bin=true
-        
-        if ${has_usr} && ${has_etc}; then
-            log_success "Archive contains valid Ubuntu rootfs structure"
-            return 0
-        else
-            log_error "Archive does not appear to contain a valid Ubuntu rootfs"
-            return 1
-        fi
-    else
-        # Cannot list contents but integrity check passed
-        log_warn "Cannot verify archive contents (Android storage limitation)"
-        log_info "Will verify rootfs structure after extraction"
-        return 0
-    fi
-}
-
-check_space() {
-    log_section "Checking Available Space"
-    
-    local available
-    available=$(available_storage_mb "${HOME}")
-    
-    log_info "Available space: ${available}MB"
-    log_info "Required space:  ${MIN_SPACE_MB}MB"
-    
-    if [[ ${available} -lt ${MIN_SPACE_MB} ]]; then
-        log_error "Insufficient space for extraction"
-        log_info "Please free up at least $((MIN_SPACE_MB - available))MB"
-        return 1
-    fi
-    
-    log_success "Sufficient space available"
-    return 0
-}
-
-prepare_rootfs_directory() {
-    log_section "Preparing Rootfs Directory"
-    
-    local rootfs="${UBUNTU_ROOT}"
-    
-    if [[ -d "${rootfs}" ]] && [[ "$(ls -A "${rootfs}" 2>/dev/null)" ]]; then
-        log_warn "Rootfs directory already exists and is not empty: ${rootfs}"
-        echo ""
-        
-        if confirm "Do you want to remove existing rootfs and start fresh?" "n"; then
-            log_info "Removing existing rootfs..."
-            rm -rf "${rootfs}"
-            log_success "Existing rootfs removed"
-        else
-            if confirm "Continue with existing rootfs (may cause issues)?" "n"; then
-                log_warn "Continuing with existing rootfs"
-                return 0
-            else
-                log_info "Extraction cancelled by user"
-                exit 0
-            fi
-        fi
-    fi
-    
-    ensure_dir "${rootfs}"
-    log_success "Rootfs directory ready: ${rootfs}"
-}
-
-extract_rootfs() {
-    local tarball="$1"
-    local rootfs="${UBUNTU_ROOT}"
-    
-    log_section "Extracting Ubuntu Rootfs"
-    
-    log_info "Source: ${tarball}"
-    log_info "Target: ${rootfs}"
-    log_info "This may take several minutes..."
-    echo ""
-    
-    # Create a temporary marker to track extraction
-    local marker="${rootfs}/.extraction_in_progress"
-    touch "${marker}"
-    
-    # Extract with progress
-    local total_files
-    total_files=$(tar -tzf "${tarball}" 2>/dev/null | wc -l)
-    log_info "Total files to extract: ${total_files}"
-    
-    # Use pv if available for progress, otherwise fall back
-    if command_exists pv; then
-        pv "${tarball}" | tar -xzf - -C "${rootfs}" 2>&1 | tee -a "${CURRENT_LOG_FILE}"
-    else
-        # Extract with basic progress indication
-        log_info "Extracting (this may take a few minutes)..."
-        
-        # Start extraction in background
-        tar -xzf "${tarball}" -C "${rootfs}" 2>&1 | tee -a "${CURRENT_LOG_FILE}" &
-        local tar_pid=$!
-        
-        # Show progress
-        local count=0
-        while kill -0 ${tar_pid} 2>/dev/null; do
-            count=$((count + 1))
-            printf "\r  Extracting... %d seconds elapsed" "${count}"
-            sleep 1
-        done
-        printf "\n"
-        
-        wait ${tar_pid}
-        local exit_code=$?
-        
-        if [[ ${exit_code} -ne 0 ]]; then
-            log_error "Extraction failed with exit code ${exit_code}"
-            rm -f "${marker}"
-            return 1
-        fi
-    fi
-    
-    # Remove extraction marker
-    rm -f "${marker}"
-    
-    # Verify extraction
-    if [[ -d "${rootfs}/usr" ]] && [[ -d "${rootfs}/etc" ]]; then
-        local extracted_size
-        extracted_size=$(du -sh "${rootfs}" | cut -f1)
-        log_success "Extraction complete! Size: ${extracted_size}"
-        return 0
-    else
-        log_error "Extraction appears incomplete"
-        return 1
-    fi
-}
 
 configure_rootfs_basic() {
     log_section "Basic Rootfs Configuration"
@@ -554,6 +223,30 @@ PROFILEEOF
     log_success "User environment configured (default password: ubuntu)"
     
     log_step 5 8 "Setting up profile scripts..."
+    
+    # Create environment script for proot (instead of using --env flags)
+    # Note: This file is sourced by the shell, not executed, but we include
+    # the shebang for documentation and editor syntax highlighting
+    cat > "${rootfs}/etc/profile.d/termux.sh" << 'EOF'
+#!/bin/bash
+# Termux PRoot Environment Configuration
+
+export HOME=/root
+export USER=root
+export TERM=xterm-256color
+export LANG=C.UTF-8
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export DISPLAY=:1
+export PULSE_SERVER=tcp:127.0.0.1:4713
+export TMPDIR=/tmp
+export SHELL=/bin/bash
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+
+# Create runtime directory
+mkdir -p "${XDG_RUNTIME_DIR}" 2>/dev/null
+chmod 700 "${XDG_RUNTIME_DIR}" 2>/dev/null
+EOF
+    chmod +x "${rootfs}/etc/profile.d/termux.sh"
     
     # Global profile additions
     cat > "${rootfs}/etc/profile.d/termux-proot.sh" << 'EOF'
@@ -897,6 +590,20 @@ verify_extraction() {
 
 main() {
     print_header "${SCRIPT_NAME}" "${SCRIPT_VERSION}"
+    
+    log_section "Verifying Rootfs"
+    
+    # Check if rootfs already exists
+    if [[ ! -d "${UBUNTU_ROOT}" ]]; then
+        die "Ubuntu rootfs not found at ${UBUNTU_ROOT}. Please extract a rootfs tarball there first."
+    fi
+    
+    if [[ ! -d "${UBUNTU_ROOT}/usr" ]] || [[ ! -d "${UBUNTU_ROOT}/etc" ]]; then
+        die "Ubuntu rootfs appears incomplete. Ensure a valid Ubuntu rootfs is extracted at ${UBUNTU_ROOT}"
+    fi
+    
+    log_success "Rootfs found at ${UBUNTU_ROOT}"
+    echo ""
 
     # Configure
     configure_rootfs_basic
@@ -905,7 +612,7 @@ main() {
     
     # Verify
     if verify_extraction; then
-        print_footer "success" "Ubuntu rootfs extraction completed successfully"
+        print_footer "success" "Ubuntu rootfs configuration completed successfully"
         
         echo ""
         echo "Ubuntu 26.04 rootfs is ready at: ${UBUNTU_ROOT}"
@@ -916,7 +623,7 @@ main() {
         
         return 0
     else
-        print_footer "error" "Extraction completed with issues"
+        print_footer "error" "Configuration completed with issues"
         return 1
     fi
 }

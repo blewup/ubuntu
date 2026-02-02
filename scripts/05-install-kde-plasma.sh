@@ -527,8 +527,10 @@ main() {
         die "Launch script not found. Run 04-configure-proot.sh first."
     fi
     
-    # Check if proot environment is ready
-    if ! proot_check "${UBUNTU_ROOT}"; then
+    # Check if proot environment is ready by checking for essential files
+    if [[ ! -d "${UBUNTU_ROOT}/usr" ]] || \
+       [[ ! -d "${UBUNTU_ROOT}/etc" ]] || \
+       [[ ! -x "${UBUNTU_ROOT}/bin/bash" ]]; then
         die "PRoot environment is not ready. Run 04-configure-proot.sh first."
     fi
     
