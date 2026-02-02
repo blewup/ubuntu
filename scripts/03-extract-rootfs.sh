@@ -213,13 +213,18 @@ verify_tarball() {
     if [[ "${verification_passed}" != "true" ]]; then
         local file_size
         file_size=$(stat -c%s "${tarball}" 2>/dev/null || stat -f%z "${tarball}" 2>/dev/null || echo "0")
-        if [[ ${file_size} -gt 20000000 ]]; then
+        local min_size=20000000
+        if [[ ${file_size} -gt ${min_size} ]]; then
             log_warn "Cannot fully verify tarball integrity (Android storage limitation)"
             log_info "File size (${file_size} bytes) suggests valid Ubuntu rootfs"
             log_info "Proceeding with extraction - will verify after extraction"
             verification_passed=true
         else
-            log_error "Tarball verification failed - file may be corrupted, too small, or inaccessible"
+            log_error "Tarball verification failed: file appears to be corrupted or too small"
+            log_error "  Current file size: ${file_size} bytes"
+            log_error "  Minimum expected:  ${min_size} bytes (~20MB)"
+            log_info "The tarball may have been incompletely downloaded or corrupted."
+            log_info "Please try re-downloading the rootfs tarball."
             return 1
         fi
     fi
