@@ -12,7 +12,8 @@
 set -euo pipefail
 
 # Critical environment setup - MUST be at the start
-HOME="/data/data/com.termux/files/home"
+# Detect Termux home directory (usually /data/data/com.termux/files/home)
+HOME="${HOME:-/data/data/com.termux/files/home}"
 export PROOT_NO_SECCOMP=1
 unset LD_PRELOAD
 
@@ -26,7 +27,7 @@ mkdir -p "${LOG_DIR}"
 # ============================================================================
 
 # Build proot command array with short flags
-cmd_array=(
+proot_cmd=(
     proot
     --link2symlink
     --kill-on-exit
@@ -40,20 +41,20 @@ cmd_array=(
 
 # Add proper tmp binding with fallback
 if [[ -d "/data/data/com.termux/files/usr/tmp" ]]; then
-    cmd_array+=(-b /data/data/com.termux/files/usr/tmp:/tmp)
+    proot_cmd+=(-b /data/data/com.termux/files/usr/tmp:/tmp)
 else
     mkdir -p "${UBUNTU_HOME}/tmp"
-    cmd_array+=(-b "${UBUNTU_HOME}/tmp:/tmp")
+    proot_cmd+=(-b "${UBUNTU_HOME}/tmp:/tmp")
 fi
 
 # Add storage access
-[[ -d "/sdcard" ]] && cmd_array+=(-b /sdcard)
-[[ -d "/storage" ]] && cmd_array+=(-b /storage)
-[[ -d "/storage/emulated/0" ]] && cmd_array+=(-b /storage/emulated/0)
+[[ -d "/sdcard" ]] && proot_cmd+=(-b /sdcard)
+[[ -d "/storage" ]] && proot_cmd+=(-b /storage)
+[[ -d "/storage/emulated/0" ]] && proot_cmd+=(-b /storage/emulated/0)
 
 # Add Android system paths if available (needed on some devices)
-[[ -d "/system" ]] && cmd_array+=(-b /system)
-[[ -d "/apex" ]] && cmd_array+=(-b /apex)
+[[ -d "/system" ]] && proot_cmd+=(-b /system)
+[[ -d "/apex" ]] && proot_cmd+=(-b /apex)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -130,12 +131,12 @@ start_audio() {
 
 launch_shell() {
     log "Starting Ubuntu shell..."
-    exec "${cmd_array[@]}" /bin/bash --login
+    exec "${proot_cmd[@]}" /bin/bash --login
 }
 
 launch_command() {
     local cmd="$1"
-    exec "${cmd_array[@]}" /bin/bash -c "${cmd}"
+    exec "${proot_cmd[@]}" /bin/bash -c "${cmd}"
 }
 
 launch_kde() {
@@ -146,7 +147,7 @@ launch_kde() {
     start_vnc "${resolution}"
     
     # Start KDE inside proot
-    "${cmd_array[@]}" /bin/bash -c "
+    "${proot_cmd[@]}" /bin/bash -c "
         export DISPLAY=:1
         export XDG_RUNTIME_DIR=/tmp/runtime-root
         mkdir -p \$XDG_RUNTIME_DIR
@@ -182,7 +183,7 @@ launch_xfce() {
     start_vnc "${resolution}"
     
     # Start XFCE inside proot
-    "${cmd_array[@]}" /bin/bash -c "
+    "${proot_cmd[@]}" /bin/bash -c "
         export DISPLAY=:1
         export XDG_RUNTIME_DIR=/tmp/runtime-root
         mkdir -p \$XDG_RUNTIME_DIR

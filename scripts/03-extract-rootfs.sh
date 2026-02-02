@@ -225,6 +225,8 @@ PROFILEEOF
     log_step 5 8 "Setting up profile scripts..."
     
     # Create environment script for proot (instead of using --env flags)
+    # Note: This file is sourced by the shell, not executed, but we include
+    # the shebang for documentation and editor syntax highlighting
     cat > "${rootfs}/etc/profile.d/termux.sh" << 'EOF'
 #!/bin/bash
 # Termux PRoot Environment Configuration
@@ -235,7 +237,7 @@ export TERM=xterm-256color
 export LANG=C.UTF-8
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export DISPLAY=:1
-export PULSE_SERVER=127.0.0.1
+export PULSE_SERVER=tcp:127.0.0.1:4713
 export TMPDIR=/tmp
 export SHELL=/bin/bash
 export XDG_RUNTIME_DIR=/tmp/runtime-root
