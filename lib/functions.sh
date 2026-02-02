@@ -176,18 +176,20 @@ dir_writable() {
 # This is more reliable than du -h on Android's FUSE/sdcardfs filesystems
 get_file_size_human() {
     local file="$1"
-    local size_bytes
+    local size_bytes=""
 
-    # Try stat first (more reliable on Android storage)
-    size_bytes=$(stat -c%s "${file}" 2>/dev/null || stat -f%z "${file}" 2>/dev/null)
-
-    # Fallback to wc if stat fails
-    if [[ -z "${size_bytes}" ]] || [[ "${size_bytes}" == "0" ]]; then
-        size_bytes=$(wc -c < "${file}" 2>/dev/null)
-    fi
-
-    # If still empty or 0, try du as last resort
-    if [[ -z "${size_bytes}" ]] || [[ "${size_bytes}" == "0" ]]; then
+    # Try Linux stat first (more reliable on Android storage)
+    if size_bytes=$(stat -c%s "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
+        : # Success - size_bytes is set
+    # Try BSD/macOS stat
+    elif size_bytes=$(stat -f%z "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
+        : # Success - size_bytes is set
+    # Fallback to wc if stat fails completely
+    elif size_bytes=$(wc -c < "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
+        # wc may include leading whitespace, trim it
+        size_bytes="${size_bytes// /}"
+    # Last resort: use du
+    else
         du -h "${file}" 2>/dev/null | cut -f1
         return
     fi
