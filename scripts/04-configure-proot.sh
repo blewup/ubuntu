@@ -120,17 +120,17 @@ done
 # ============================================================================
 
 PROOT_ENV_ARGS=(
-    "--env=HOME=${UBUNTU_HOME_TARGET}"
-    "--env=USER=droid"
-    "--env=LOGNAME=droid"
-    "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    "--env=TERM=${TERM:-xterm-256color}"
-    "--env=LANG=C.UTF-8"
-    "--env=LC_ALL=C.UTF-8"
-    "--env=TMPDIR=/tmp"
-    "--env=SHELL=/bin/bash"
-    "--env=DISPLAY=${DISPLAY:-:1}"
-    "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
+    "--env" "HOME=${UBUNTU_HOME_TARGET}"
+    "--env" "USER=droid"
+    "--env" "LOGNAME=droid"
+    "--env" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    "--env" "TERM=${TERM:-xterm-256color}"
+    "--env" "LANG=C.UTF-8"
+    "--env" "LC_ALL=C.UTF-8"
+    "--env" "TMPDIR=/tmp"
+    "--env" "SHELL=/bin/bash"
+    "--env" "DISPLAY=${DISPLAY:-:1}"
+    "--env" "PULSE_SERVER=tcp:127.0.0.1:4713"
 )
 
 # ============================================================================
