@@ -71,7 +71,6 @@ check_rootfs() {
     local essential_bins=(
         "/bin/bash"
         "/bin/sh"
-        "/usr/bin/env"
     )
     local missing=()
     
