@@ -427,6 +427,12 @@ launch_shell() {
     fi
     echo ""
     
+    # Workaround for "Function not implemented" error on some Android kernels
+    # PROOT_NO_SECCOMP disables seccomp filtering that can cause syscall failures
+    export PROOT_NO_SECCOMP=1
+    
+    # Unset LD_PRELOAD to avoid conflicts with Termux-exec hook
+    unset LD_PRELOAD
     # Determine working directory - use /home/droid if it exists, otherwise /root
     local work_dir="/root"
     local home_dir="/root"
@@ -472,6 +478,11 @@ launch_shell() {
     [[ -e "/dev/kgsl-3d0" ]] && proot_args+=("--bind=/dev/kgsl-3d0")
     [[ -d "/dev/dri" ]] && proot_args+=("--bind=/dev/dri")
     
+    # Add Android system paths if available (needed on some devices)
+    [[ -d "/system" ]] && proot_args+=("--bind=/system")
+    [[ -d "/apex" ]] && proot_args+=("--bind=/apex")
+    
+    # Environment setup
     # Environment setup using proot's native --env= flags
     local env_args=(
         "--env=HOME=/home/droid"
