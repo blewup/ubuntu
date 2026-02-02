@@ -43,6 +43,10 @@ proot_build_binds() {
     [[ -d "/dev/dri" ]] && binds+=" --bind=/dev/dri"
     [[ -e "/dev/ion" ]] && binds+=" --bind=/dev/ion"
     
+    # Android system paths (needed on some devices)
+    [[ -d "/system" ]] && binds+=" --bind=/system"
+    [[ -d "/apex" ]] && binds+=" --bind=/apex"
+    
     echo "${binds}"
 }
 
@@ -90,12 +94,23 @@ proot_build_command() {
 # PROOT EXECUTION
 # ============================================================================
 
+# Prepare proot environment (called before running proot commands)
+proot_prepare_env() {
+    # Workaround for "Function not implemented" error on some Android kernels
+    # PROOT_NO_SECCOMP disables seccomp filtering that can cause syscall failures
+    export PROOT_NO_SECCOMP=1
+    
+    # Unset LD_PRELOAD to avoid conflicts with Termux-exec hook
+    unset LD_PRELOAD
+}
+
 # Run a command in proot
 proot_run() {
     local cmd="$*"
     local proot_cmd
     proot_cmd=$(proot_build_command)
     
+    proot_prepare_env
     eval "${proot_cmd} /bin/bash -c '${cmd}'"
 }
 
@@ -104,6 +119,7 @@ proot_shell() {
     local proot_cmd
     proot_cmd=$(proot_build_command)
     
+    proot_prepare_env
     eval "${proot_cmd} /bin/bash --login"
 }
 
@@ -141,5 +157,5 @@ proot_get_pids() {
 
 export PROOT_UBUNTU_ROOT PROOT_HOME_BIND PROOT_HOME_TARGET
 export -f proot_build_binds proot_build_env proot_build_command
-export -f proot_run proot_shell proot_check
+export -f proot_prepare_env proot_run proot_shell proot_check
 export -f proot_kill_all proot_is_running proot_get_pids

@@ -21,6 +21,13 @@ mkdir -p "${LOG_DIR}"
 # CONFIGURATION
 # ============================================================================
 
+# Workaround for "Function not implemented" error on some Android kernels
+# PROOT_NO_SECCOMP disables seccomp filtering that can cause syscall failures
+export PROOT_NO_SECCOMP=1
+
+# Unset LD_PRELOAD to avoid conflicts with Termux-exec hook
+unset LD_PRELOAD
+
 PROOT_ARGS=(
     --link2symlink
     --kill-on-exit
@@ -40,6 +47,10 @@ PROOT_ARGS=(
     --env=DISPLAY=:1
     --env=PULSE_SERVER=127.0.0.1
 )
+
+# Add Android system paths if available (needed on some devices)
+[[ -d "/system" ]] && PROOT_ARGS+=(--bind=/system)
+[[ -d "/apex" ]] && PROOT_ARGS+=(--bind=/apex)
 
 # ============================================================================
 # HELPER FUNCTIONS
