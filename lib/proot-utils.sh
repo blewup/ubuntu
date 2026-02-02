@@ -46,23 +46,23 @@ proot_build_binds() {
     echo "${binds}"
 }
 
-# Build environment variables
+# Build environment variables using proot's native --env= flags
 proot_build_env() {
     local display="${1:-:1}"
     
     local env=""
-    env+=" HOME=${PROOT_HOME_TARGET}"
-    env+=" USER=droid"
-    env+=" LOGNAME=droid"
-    env+=" PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    env+=" TERM=${TERM:-xterm-256color}"
-    env+=" LANG=C.UTF-8"
-    env+=" LC_ALL=C.UTF-8"
-    env+=" TMPDIR=/tmp"
-    env+=" SHELL=/bin/bash"
-    env+=" DISPLAY=${display}"
-    env+=" PULSE_SERVER=tcp:127.0.0.1:4713"
-    env+=" XDG_RUNTIME_DIR=/tmp/runtime-droid"
+    env+=" --env=HOME=${PROOT_HOME_TARGET}"
+    env+=" --env=USER=droid"
+    env+=" --env=LOGNAME=droid"
+    env+=" --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    env+=" --env=TERM=${TERM:-xterm-256color}"
+    env+=" --env=LANG=C.UTF-8"
+    env+=" --env=LC_ALL=C.UTF-8"
+    env+=" --env=TMPDIR=/tmp"
+    env+=" --env=SHELL=/bin/bash"
+    env+=" --env=DISPLAY=${display}"
+    env+=" --env=PULSE_SERVER=tcp:127.0.0.1:4713"
+    env+=" --env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
     
     echo "${env}"
 }
@@ -80,7 +80,6 @@ proot_build_command() {
     cmd+=" --cwd=${PROOT_HOME_TARGET}"
     cmd+=" --pwd=${PROOT_HOME_TARGET}"
     cmd+="$(proot_build_binds)"
-    cmd+=" /usr/bin/env -i"
     cmd+="$(proot_build_env "${display}")"
     
     echo "${cmd}"
