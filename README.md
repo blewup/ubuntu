@@ -32,6 +32,21 @@ Step	Action	Command
 3	Start Ubuntu shell	ubuntu
 4	Start KDE desktop	ubuntu-kde
 
+🔐 Default User Accounts
+After running `03-extract-rootfs.sh`, the following user accounts are created:
+
+| Username | Password | Description |
+|----------|----------|-------------|
+| root     | ubuntu   | Root user with full system access |
+| droid    | ubuntu   | Regular user with sudo access (recommended) |
+
+**Important:** Run `ubuntu --first-boot` after installation to:
+- Update the system packages
+- Configure locales
+- Optionally change the default passwords
+
+The home directory `/home/droid` is bind-mounted to `/sdcard` for easy file access.
+
 📁 Full Project Structure
 Code
 ~/ubuntu/

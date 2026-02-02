@@ -244,8 +244,16 @@ pre_launch_checks() {
     local missing_bins=()
     
     for bin in "${essential_bins[@]}"; do
-        if [[ ! -x "${UBUNTU_ROOTFS}${bin}" ]] && [[ ! -f "${UBUNTU_ROOTFS}${bin}" ]]; then
-            missing_bins+=("${bin}")
+        # Check both regular file and symlink cases
+        if [[ ! -e "${UBUNTU_ROOTFS}${bin}" ]]; then
+            # Also check usr-merged paths (Ubuntu uses merged /usr)
+            local alt_path="${bin}"
+            if [[ "${bin}" == "/bin/"* ]]; then
+                alt_path="/usr${bin}"
+            fi
+            if [[ ! -e "${UBUNTU_ROOTFS}${alt_path}" ]]; then
+                missing_bins+=("${bin}")
+            fi
         fi
     done
     
@@ -268,19 +276,41 @@ pre_launch_checks() {
         exit 1
     fi
     
-    # Create tmp directory if needed
-    mkdir -p /data/data/com.termux/files/usr/tmp 2>/dev/null || true
-    chmod 1777 /data/data/com.termux/files/usr/tmp 2>/dev/null || true
+    # Create and set up Termux tmp directory for proot
+    local termux_tmp="/data/data/com.termux/files/usr/tmp"
+    mkdir -p "${termux_tmp}" 2>/dev/null || true
+    chmod 1777 "${termux_tmp}" 2>/dev/null || true
     
-    # Ensure home directory structure exists on sdcard
+    # Create XDG runtime directory in Termux tmp
+    mkdir -p "${termux_tmp}/runtime-droid" 2>/dev/null || true
+    chmod 700 "${termux_tmp}/runtime-droid" 2>/dev/null || true
+    
+    # Clean up stale proot temp files that may cause "Function not implemented" errors
+    # These files are created by proot and can become stale
+    find "${termux_tmp}" -maxdepth 1 -name "proot-*" -type f -mmin +60 -delete 2>/dev/null || true
+    find "${termux_tmp}" -maxdepth 1 -name "proot-*" -type d -mmin +60 -exec rm -rf {} \; 2>/dev/null || true
+    
+    # Ensure /home/droid exists in rootfs with proper setup
+    local rootfs_home="${UBUNTU_ROOTFS}/home/droid"
+    if [[ ! -d "${rootfs_home}" ]]; then
+        echo "  ${COLOR_CYAN}→${COLOR_RESET} Creating /home/droid in rootfs..."
+        mkdir -p "${rootfs_home}"
+        mkdir -p "${rootfs_home}/.config"
+        mkdir -p "${rootfs_home}/.local/share"
+        mkdir -p "${rootfs_home}/.cache"
+        chmod 755 "${rootfs_home}"
+        chown -R 1000:1000 "${rootfs_home}" 2>/dev/null || true
+    fi
+    
+    # Ensure home directory structure exists on sdcard (for bind mount)
     local home_dirs=("Documents" "Downloads" "Projects" "Pictures" "Music" "Videos" ".config" ".local" ".cache")
     for dir in "${home_dirs[@]}"; do
         mkdir -p "/sdcard/${dir}" 2>/dev/null || true
     done
     
-    # Create XDG runtime directory
-    mkdir -p /data/data/com.termux/files/usr/tmp/runtime-droid 2>/dev/null || true
-    chmod 700 /data/data/com.termux/files/usr/tmp/runtime-droid 2>/dev/null || true
+    # Ensure tmp directory exists in rootfs
+    mkdir -p "${UBUNTU_ROOTFS}/tmp" 2>/dev/null || true
+    chmod 1777 "${UBUNTU_ROOTFS}/tmp" 2>/dev/null || true
 }
 
 # ============================================================================
