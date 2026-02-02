@@ -14,13 +14,7 @@ set -euo pipefail
 UBUNTU_HOME="${HOME}/ubuntu"
 ROOTFS="${UBUNTU_HOME}/rootfs"
 LOG_DIR="${UBUNTU_HOME}/logs"
---env HOME=/root
---env USER=root
---env TERM=xterm-256color
---env LANG=en_US.UTF-8
---env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
---env DISPLAY=:1
---env PULSE_SERVER=127.0.0.1
+
 mkdir -p "${LOG_DIR}"
 
 # ============================================================================
@@ -35,21 +29,19 @@ export PROOT_NO_SECCOMP=1
 unset LD_PRELOAD
 
 PROOT_ARGS=(
-    --link2symlink
-    --kill-on-exit
-    --root-id
-    --rootfs="${ROOTFS}"
-    --bind=/dev
-    --bind=/proc
-    --bind=/sys
-    --bind="${UBUNTU_HOME}:/ubuntu"
-    --bind=/data/data/com.termux/files/usr/tmp:/tmp
-    --cwd=/root
+    -0
+    -r "${ROOTFS}"
+    -b /dev
+    -b /proc
+    -b /sys
+    -b "${UBUNTU_HOME}:/ubuntu"
+    -b /data/data/com.termux/files/usr/tmp:/tmp
+    -w /root
 )
 
 # Add Android system paths if available (needed on some devices)
-[[ -d "/system" ]] && PROOT_ARGS+=(--bind=/system)
-[[ -d "/apex" ]] && PROOT_ARGS+=(--bind=/apex)
+[[ -d "/system" ]] && PROOT_ARGS+=(-b /system)
+[[ -d "/apex" ]] && PROOT_ARGS+=(-b /apex)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -63,6 +55,13 @@ check_rootfs() {
     if [[ ! -d "${ROOTFS}" ]]; then
         echo "Error: Ubuntu rootfs not found at ${ROOTFS}"
         echo "Run: bash ~/ubuntu/scripts/03-extract-rootfs.sh"
+        exit 1
+    fi
+    
+    # Prevent nested proot sessions
+    if [[ -n "${PROOT_ACTIVE}" ]]; then
+        echo "Error: Already running inside proot environment"
+        echo "Exit current session before starting a new one"
         exit 1
     fi
     
@@ -126,12 +125,28 @@ start_audio() {
 
 launch_shell() {
     log "Starting Ubuntu shell..."
-    exec proot "${PROOT_ARGS[@]}" /bin/bash --login
+    exec proot "${PROOT_ARGS[@]}" /bin/bash -c "
+        export PROOT_ACTIVE=1
+        export HOME=/root
+        export USER=root
+        export TERM=xterm-256color
+        export LANG=en_US.UTF-8
+        export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        exec /bin/bash --login
+    "
 }
 
 launch_command() {
     local cmd="$1"
-    exec proot "${PROOT_ARGS[@]}" /bin/bash -c "${cmd}"
+    exec proot "${PROOT_ARGS[@]}" /bin/bash -c "
+        export PROOT_ACTIVE=1
+        export HOME=/root
+        export USER=root
+        export TERM=xterm-256color
+        export LANG=en_US.UTF-8
+        export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        ${cmd}
+    "
 }
 
 launch_kde() {
@@ -143,6 +158,12 @@ launch_kde() {
     
     # Start KDE inside proot
     proot "${PROOT_ARGS[@]}" /bin/bash -c "
+        export PROOT_ACTIVE=1
+        export HOME=/root
+        export USER=root
+        export TERM=xterm-256color
+        export LANG=en_US.UTF-8
+        export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         export DISPLAY=:1
         export XDG_RUNTIME_DIR=/tmp/runtime-root
         mkdir -p \$XDG_RUNTIME_DIR
@@ -179,6 +200,12 @@ launch_xfce() {
     
     # Start XFCE inside proot
     proot "${PROOT_ARGS[@]}" /bin/bash -c "
+        export PROOT_ACTIVE=1
+        export HOME=/root
+        export USER=root
+        export TERM=xterm-256color
+        export LANG=en_US.UTF-8
+        export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         export DISPLAY=:1
         export XDG_RUNTIME_DIR=/tmp/runtime-root
         mkdir -p \$XDG_RUNTIME_DIR
