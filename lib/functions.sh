@@ -377,13 +377,11 @@ proot_cmd() {
         "--bind=/storage" \
         "--cwd=${UBUNTU_HOME_TARGET}" \
         "--pwd=${UBUNTU_HOME_TARGET}" \
-        "/usr/bin/env" \
-        "-i" \
-        "HOME=${UBUNTU_HOME_TARGET}" \
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-        "TERM=${TERM}" \
-        "LANG=C.UTF-8" \
-        "TMPDIR=/tmp"
+        "--env=HOME=${UBUNTU_HOME_TARGET}" \
+        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+        "--env=TERM=${TERM}" \
+        "--env=LANG=C.UTF-8" \
+        "--env=TMPDIR=/tmp"
 }
 
 # Execute command inside proot
