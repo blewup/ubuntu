@@ -345,33 +345,30 @@ for bind in "${PROOT_BINDS[@]}"; do
     PROOT_BIND_ARGS+=" --bind=${bind}"
 done
 
-# Environment variables for proot
+# Environment variables for proot (using --env= format)
 PROOT_ENV=(
-    "HOME=/home/droid"
-    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    "TERM=${TERM:-xterm-256color}"
-    "LANG=C.UTF-8"
-    "TMPDIR=/tmp"
-    "DISPLAY=${DISPLAY:-:1}"
-    "PULSE_SERVER=tcp:127.0.0.1:4713"
+    "--env=HOME=/home/droid"
+    "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    "--env=TERM=${TERM:-xterm-256color}"
+    "--env=LANG=C.UTF-8"
+    "--env=TMPDIR=/tmp"
+    "--env=DISPLAY=${DISPLAY:-:1}"
+    "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
 )
 
 if ${SHIZUKU_AVAILABLE}; then
     PROOT_ENV+=(
-        "SHIZUKU_AVAILABLE=1"
-        "LIBGL_ALWAYS_SOFTWARE=0"
+        "--env=SHIZUKU_AVAILABLE=1"
+        "--env=LIBGL_ALWAYS_SOFTWARE=0"
     )
 else
     PROOT_ENV+=(
-        "SHIZUKU_AVAILABLE=0"
+        "--env=SHIZUKU_AVAILABLE=0"
     )
 fi
 
 # Build environment arguments
-PROOT_ENV_ARGS=""
-for env in "${PROOT_ENV[@]}"; do
-    PROOT_ENV_ARGS+=" ${env}"
-done
+PROOT_ENV_ARGS="${PROOT_ENV[*]}"
 
 # Export for use by launch scripts
 export PROOT_ARGS PROOT_BIND_ARGS PROOT_ENV_ARGS SHIZUKU_AVAILABLE

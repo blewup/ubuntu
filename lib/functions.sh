@@ -358,9 +358,27 @@ pkg_install() {
 # PROOT HELPERS
 # ============================================================================
 
+# Determine working directory based on what exists in rootfs
+proot_get_cwd() {
+    local rootfs="${1:-${UBUNTU_ROOT}}"
+    
+    # Prefer /home/droid if it exists in rootfs
+    if [[ -d "${rootfs}${UBUNTU_HOME_TARGET}" ]]; then
+        echo "${UBUNTU_HOME_TARGET}"
+    # Fallback to /root
+    elif [[ -d "${rootfs}/root" ]]; then
+        echo "/root"
+    # Ultimate fallback
+    else
+        echo "/"
+    fi
+}
+
 # Generate proot launch command
 proot_cmd() {
     local rootfs="${1:-${UBUNTU_ROOT}}"
+    local work_dir
+    work_dir=$(proot_get_cwd "${rootfs}")
     
     echo "proot" \
         "--link2symlink" \
@@ -375,15 +393,12 @@ proot_cmd() {
         "--bind=${UBUNTU_HOME_BIND}:${UBUNTU_HOME_TARGET}" \
         "--bind=/sdcard" \
         "--bind=/storage" \
-        "--cwd=${UBUNTU_HOME_TARGET}" \
-        "--pwd=${UBUNTU_HOME_TARGET}" \
-        "/usr/bin/env" \
-        "-i" \
-        "HOME=${UBUNTU_HOME_TARGET}" \
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-        "TERM=${TERM}" \
-        "LANG=C.UTF-8" \
-        "TMPDIR=/tmp"
+        "--cwd=${work_dir}" \
+        "--env=HOME=${UBUNTU_HOME_TARGET}" \
+        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+        "--env=TERM=${TERM:-xterm-256color}" \
+        "--env=LANG=C.UTF-8" \
+        "--env=TMPDIR=/tmp"
 }
 
 # Execute command inside proot
