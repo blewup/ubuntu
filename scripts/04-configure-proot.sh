@@ -424,8 +424,10 @@ launch_shell() {
     
     # Determine working directory - use /home/droid if it exists, otherwise /root
     local work_dir="/root"
+    local home_dir="/root"
     if [[ -d "${UBUNTU_ROOTFS}/home/droid" ]]; then
         work_dir="/home/droid"
+        home_dir="/home/droid"
     fi
     
     # Build and execute proot command
@@ -436,15 +438,15 @@ launch_shell() {
         "--root-id"
         "--rootfs=${UBUNTU_ROOTFS}"
         "--cwd=${work_dir}"
+        "--pwd=${work_dir}"
         "--bind=/dev"
         "--bind=/dev/urandom:/dev/random"
         "--bind=/proc"
         "--bind=/sys"
         "--bind=/data/data/com.termux/files/usr/tmp:/tmp"
-        "--bind=/sdcard:/home/droid"
         "--bind=/sdcard"
         "--bind=/storage"
-        "--env=HOME=/home/droid"
+        "--env=HOME=${home_dir}"
         "--env=USER=droid"
         "--env=LOGNAME=droid"
         "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -457,6 +459,9 @@ launch_shell() {
         "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
         "--env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
     )
+    
+    # Add /home/droid bind only if directory exists
+    [[ -d "${UBUNTU_ROOTFS}/home/droid" ]] && proot_args+=("--bind=/sdcard:/home/droid")
     
     # Add GPU binds if available
     [[ -e "/dev/kgsl-3d0" ]] && proot_args+=("--bind=/dev/kgsl-3d0")

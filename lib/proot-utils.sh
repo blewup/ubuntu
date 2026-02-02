@@ -22,6 +22,7 @@ PROOT_HOME_TARGET="/home/droid"
 
 # Build bind mount arguments
 proot_build_binds() {
+    local rootfs="${1:-${PROOT_UBUNTU_ROOT}}"
     local binds=""
     
     # Essential system mounts
@@ -33,8 +34,10 @@ proot_build_binds() {
     # Termux tmp
     binds+=" --bind=/data/data/com.termux/files/usr/tmp:/tmp"
     
-    # User data
-    binds+=" --bind=${PROOT_HOME_BIND}:${PROOT_HOME_TARGET}"
+    # User data - only bind /sdcard:/home/droid if /home/droid exists in rootfs
+    if [[ -d "${rootfs}${PROOT_HOME_TARGET}" ]]; then
+        binds+=" --bind=${PROOT_HOME_BIND}:${PROOT_HOME_TARGET}"
+    fi
     binds+=" --bind=/sdcard"
     binds+=" --bind=/storage"
     
@@ -49,9 +52,10 @@ proot_build_binds() {
 # Build environment variables as proot --env flags
 proot_build_env() {
     local display="${1:-:1}"
+    local home_dir="${2:-${PROOT_HOME_TARGET}}"
     
     local env=""
-    env+=" --env=HOME=${PROOT_HOME_TARGET}"
+    env+=" --env=HOME=${home_dir}"
     env+=" --env=USER=droid"
     env+=" --env=LOGNAME=droid"
     env+=" --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -98,8 +102,9 @@ proot_build_command() {
     cmd+=" --root-id"
     cmd+=" --rootfs=${rootfs}"
     cmd+=" --cwd=${work_dir}"
-    cmd+="$(proot_build_binds)"
-    cmd+="$(proot_build_env "${display}")"
+    cmd+=" --pwd=${work_dir}"
+    cmd+="$(proot_build_binds "${rootfs}")"
+    cmd+="$(proot_build_env "${display}" "${work_dir}")"
     
     echo "${cmd}"
 }
