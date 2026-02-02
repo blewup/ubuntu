@@ -373,7 +373,10 @@ EOF
     done
     
     # Set up passwords for root and droid user
-    # Using a simple default password "ubuntu" - user should change this after first login
+    # NOTE: This uses a well-known default password "ubuntu" that users MUST change after first boot.
+    # The hash is intentionally static so users know what password to use on first login.
+    # Security consideration: The first-boot-setup script prompts users to change passwords.
+    # Users are also reminded in the console output and README to change these defaults.
     # Password hash for "ubuntu" generated with: openssl passwd -6 ubuntu
     local default_pass_hash='$6$rounds=656000$PmwDC9mVbX3lLrTn$YwKxBjvWPcvXfvXNhHuOu.V4RGBUGqJxhzJJnHJ6.WXpxJQJqKKaB3nZvQKJvfvLzq4yR4VqMPCxzV0qLvH4n0'
     
@@ -678,6 +681,7 @@ apt-get upgrade -y
 
 echo ""
 echo "[3/7] Installing essential packages..."
+# Note: 'passwd' package is required for the password change functionality in step 6/7
 apt-get install -y \
     sudo \
     nano \

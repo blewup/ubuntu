@@ -286,9 +286,10 @@ pre_launch_checks() {
     chmod 700 "${termux_tmp}/runtime-droid" 2>/dev/null || true
     
     # Clean up stale proot temp files that may cause "Function not implemented" errors
-    # These files are created by proot and can become stale
-    find "${termux_tmp}" -maxdepth 1 -name "proot-*" -type f -mmin +60 -delete 2>/dev/null || true
-    find "${termux_tmp}" -maxdepth 1 -name "proot-*" -type d -mmin +60 -exec rm -rf {} \; 2>/dev/null || true
+    # These files are created by proot and can become stale after crashes or improper shutdowns
+    # Stale threshold in minutes - files older than this are considered safe to remove
+    local stale_threshold_minutes=60
+    find "${termux_tmp}" -maxdepth 1 -name "proot-*" \( -type f -o -type d \) -mmin +${stale_threshold_minutes} -exec rm -rf {} \; 2>/dev/null || true
     
     # Ensure /home/droid exists in rootfs with proper setup
     local rootfs_home="${UBUNTU_ROOTFS}/home/droid"
