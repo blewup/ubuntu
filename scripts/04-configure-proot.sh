@@ -62,12 +62,12 @@ proot_get_cwd() {
     fi
 }
 
-# Core proot options
+# Core proot options (using short forms for compatibility)
 PROOT_CORE_ARGS=(
     "--link2symlink"           # Handle symlinks properly
     "--kill-on-exit"           # Clean up child processes on exit
-    "--root-id"                # Fake root user (uid 0)
-    "--rootfs=${UBUNTU_ROOTFS}"
+    "-0"                       # Fake root user (uid 0)
+    "-r"                       # Root filesystem (value added separately)
 )
 
 # ============================================================================
@@ -116,21 +116,21 @@ for heap in /dev/dma_heap/*; do
 done
 
 # ============================================================================
-# ENVIRONMENT VARIABLES (as --env= flags for proot)
+# ENVIRONMENT VARIABLES (using -e for proot)
 # ============================================================================
 
 PROOT_ENV_ARGS=(
-    "--env" "HOME=${UBUNTU_HOME_TARGET}"
-    "--env" "USER=droid"
-    "--env" "LOGNAME=droid"
-    "--env" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    "--env" "TERM=${TERM:-xterm-256color}"
-    "--env" "LANG=C.UTF-8"
-    "--env" "LC_ALL=C.UTF-8"
-    "--env" "TMPDIR=/tmp"
-    "--env" "SHELL=/bin/bash"
-    "--env" "DISPLAY=${DISPLAY:-:1}"
-    "--env" "PULSE_SERVER=tcp:127.0.0.1:4713"
+    "-e" "HOME=${UBUNTU_HOME_TARGET}"
+    "-e" "USER=droid"
+    "-e" "LOGNAME=droid"
+    "-e" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    "-e" "TERM=${TERM:-xterm-256color}"
+    "-e" "LANG=C.UTF-8"
+    "-e" "LC_ALL=C.UTF-8"
+    "-e" "TMPDIR=/tmp"
+    "-e" "SHELL=/bin/bash"
+    "-e" "DISPLAY=${DISPLAY:-:1}"
+    "-e" "PULSE_SERVER=tcp:127.0.0.1:4713"
 )
 
 # ============================================================================
@@ -142,32 +142,27 @@ build_bind_args() {
     local args=""
     
     for bind in "${PROOT_SYSTEM_BINDS[@]}"; do
-        args+=" --bind=${bind}"
+        args+=" -b ${bind}"
     done
     
     for bind in "${PROOT_TERMUX_BINDS[@]}"; do
-        args+=" --bind=${bind}"
+        args+=" -b ${bind}"
     done
     
     for bind in "${PROOT_USER_BINDS[@]}"; do
-        args+=" --bind=${bind}"
+        args+=" -b ${bind}"
     done
     
     for bind in "${PROOT_GPU_BINDS[@]}"; do
-        args+=" --bind=${bind}"
+        args+=" -b ${bind}"
     done
     
     echo "${args}"
 }
 
-# Build environment arguments using proot's native --env= flags
+# Build environment arguments
 build_env_args() {
     echo "${PROOT_ENV_ARGS[*]}"
-    local args=""
-    for env in "${PROOT_ENV_VARS[@]}"; do
-        args+=" --env=${env}"
-    done
-    echo "${args}"
 }
 
 # Build complete proot command
@@ -177,8 +172,7 @@ build_proot_command() {
     local cwd
     cwd=$(proot_get_cwd)
     
-    echo "proot ${PROOT_CORE_ARGS[*]} --cwd=${cwd} $(build_bind_args) $(build_env_args) ${shell} ${login}"
-    echo "proot ${PROOT_CORE_ARGS[*]} $(build_bind_args) $(build_env_args) ${shell} ${login}"
+    echo "proot ${PROOT_CORE_ARGS[*]} ${UBUNTU_ROOTFS} -w ${cwd} $(build_bind_args) $(build_env_args) ${shell} ${login}"
 }
 EOF
 
@@ -446,58 +440,40 @@ launch_shell() {
         "proot"
         "--link2symlink"
         "--kill-on-exit"
-        "--root-id"
-        "--rootfs=${UBUNTU_ROOTFS}"
-        "--cwd=${work_dir}"
-        "--pwd=${work_dir}"
-        "--bind=/dev"
-        "--bind=/dev/urandom:/dev/random"
-        "--bind=/proc"
-        "--bind=/sys"
-        "--bind=/data/data/com.termux/files/usr/tmp:/tmp"
-        "--bind=/sdcard"
-        "--bind=/storage"
-        "--env=HOME=${home_dir}"
-        "--env=USER=droid"
-        "--env=LOGNAME=droid"
-        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        "--env=TERM=${TERM:-xterm-256color}"
-        "--env=LANG=C.UTF-8"
-        "--env=LC_ALL=C.UTF-8"
-        "--env=TMPDIR=/tmp"
-        "--env=SHELL=/bin/bash"
-        "--env=DISPLAY=:${VNC_DISPLAY}"
-        "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
-        "--env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
+        "-0"
+        "-r" "${UBUNTU_ROOTFS}"
+        "-w" "${work_dir}"
+        "-b" "/dev"
+        "-b" "/dev/urandom:/dev/random"
+        "-b" "/proc"
+        "-b" "/sys"
+        "-b" "/data/data/com.termux/files/usr/tmp:/tmp"
+        "-b" "/sdcard"
+        "-b" "/storage"
+        "-e" "HOME=${home_dir}"
+        "-e" "USER=droid"
+        "-e" "LOGNAME=droid"
+        "-e" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        "-e" "TERM=${TERM:-xterm-256color}"
+        "-e" "LANG=C.UTF-8"
+        "-e" "LC_ALL=C.UTF-8"
+        "-e" "TMPDIR=/tmp"
+        "-e" "SHELL=/bin/bash"
+        "-e" "DISPLAY=:${VNC_DISPLAY}"
+        "-e" "PULSE_SERVER=tcp:127.0.0.1:4713"
+        "-e" "XDG_RUNTIME_DIR=/tmp/runtime-droid"
     )
     
     # Add /home/droid bind only if directory exists
-    [[ -d "${UBUNTU_ROOTFS}/home/droid" ]] && proot_args+=("--bind=/sdcard:/home/droid")
+    [[ -d "${UBUNTU_ROOTFS}/home/droid" ]] && proot_args+=("-b" "/sdcard:/home/droid")
     
     # Add GPU binds if available
-    [[ -e "/dev/kgsl-3d0" ]] && proot_args+=("--bind=/dev/kgsl-3d0")
-    [[ -d "/dev/dri" ]] && proot_args+=("--bind=/dev/dri")
+    [[ -e "/dev/kgsl-3d0" ]] && proot_args+=("-b" "/dev/kgsl-3d0")
+    [[ -d "/dev/dri" ]] && proot_args+=("-b" "/dev/dri")
     
     # Add Android system paths if available (needed on some devices)
-    [[ -d "/system" ]] && proot_args+=("--bind=/system")
-    [[ -d "/apex" ]] && proot_args+=("--bind=/apex")
-    
-    # Environment setup
-    # Environment setup using proot's native --env= flags
-    local env_args=(
-        "--env=HOME=/home/droid"
-        "--env=USER=droid"
-        "--env=LOGNAME=droid"
-        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        "--env=TERM=${TERM:-xterm-256color}"
-        "--env=LANG=C.UTF-8"
-        "--env=LC_ALL=C.UTF-8"
-        "--env=TMPDIR=/tmp"
-        "--env=SHELL=/bin/bash"
-        "--env=DISPLAY=:${VNC_DISPLAY}"
-        "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
-        "--env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
-    )
+    [[ -d "/system" ]] && proot_args+=("-b" "/system")
+    [[ -d "/apex" ]] && proot_args+=("-b" "/apex")
     
     if [[ -n "${cmd}" ]]; then
         # Run single command

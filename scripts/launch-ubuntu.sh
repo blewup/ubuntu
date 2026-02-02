@@ -14,13 +14,7 @@ set -euo pipefail
 UBUNTU_HOME="${HOME}/ubuntu"
 ROOTFS="${UBUNTU_HOME}/rootfs"
 LOG_DIR="${UBUNTU_HOME}/logs"
---env HOME=/root
---env USER=root
---env TERM=xterm-256color
---env LANG=en_US.UTF-8
---env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
---env DISPLAY=:1
---env PULSE_SERVER=127.0.0.1
+
 mkdir -p "${LOG_DIR}"
 
 # ============================================================================
@@ -37,19 +31,19 @@ unset LD_PRELOAD
 PROOT_ARGS=(
     --link2symlink
     --kill-on-exit
-    --root-id
-    --rootfs="${ROOTFS}"
-    --bind=/dev
-    --bind=/proc
-    --bind=/sys
-    --bind="${UBUNTU_HOME}:/ubuntu"
-    --bind=/data/data/com.termux/files/usr/tmp:/tmp
-    --cwd=/root
+    -0
+    -r "${ROOTFS}"
+    -b /dev
+    -b /proc
+    -b /sys
+    -b "${UBUNTU_HOME}:/ubuntu"
+    -b /data/data/com.termux/files/usr/tmp:/tmp
+    -w /root
 )
 
 # Add Android system paths if available (needed on some devices)
-[[ -d "/system" ]] && PROOT_ARGS+=(--bind=/system)
-[[ -d "/apex" ]] && PROOT_ARGS+=(--bind=/apex)
+[[ -d "/system" ]] && PROOT_ARGS+=(-b /system)
+[[ -d "/apex" ]] && PROOT_ARGS+=(-b /apex)
 
 # ============================================================================
 # HELPER FUNCTIONS

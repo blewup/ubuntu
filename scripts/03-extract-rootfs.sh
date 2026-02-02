@@ -316,15 +316,20 @@ extract_rootfs() {
     total_files=$(tar -tzf "${tarball}" 2>/dev/null | wc -l)
     log_info "Total files to extract: ${total_files}"
     
+    # Use proot --link2symlink for extraction to handle symlinks properly
+    log_info "Using proot with --link2symlink for proper symlink handling..."
+    export PROOT_NO_SECCOMP=1
+    unset LD_PRELOAD
+    
     # Use pv if available for progress, otherwise fall back
     if command_exists pv; then
-        pv "${tarball}" | tar -xzf - -C "${rootfs}" 2>&1 | tee -a "${CURRENT_LOG_FILE}"
+        pv "${tarball}" | proot --link2symlink tar -xzf - -C "${rootfs}" 2>&1 | tee -a "${CURRENT_LOG_FILE}"
     else
         # Extract with basic progress indication
         log_info "Extracting (this may take a few minutes)..."
         
-        # Start extraction in background
-        tar -xzf "${tarball}" -C "${rootfs}" 2>&1 | tee -a "${CURRENT_LOG_FILE}" &
+        # Start extraction in background with proot
+        proot --link2symlink tar -xzf "${tarball}" -C "${rootfs}" 2>&1 | tee -a "${CURRENT_LOG_FILE}" &
         local tar_pid=$!
         
         # Show progress
@@ -898,6 +903,22 @@ verify_extraction() {
 main() {
     print_header "${SCRIPT_NAME}" "${SCRIPT_VERSION}"
 
+    # Check space
+    check_space || die "Insufficient disk space"
+    
+    # Find or download tarball
+    local tarball
+    tarball=$(find_tarball) || die "Failed to find Ubuntu rootfs tarball"
+    
+    # Verify tarball integrity
+    verify_tarball "${tarball}" || die "Tarball verification failed"
+    
+    # Prepare rootfs directory
+    prepare_rootfs_directory
+    
+    # Extract
+    extract_rootfs "${tarball}" || die "Extraction failed"
+    
     # Configure
     configure_rootfs_basic
     create_proot_fixes
