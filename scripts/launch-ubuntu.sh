@@ -30,14 +30,13 @@ unset LD_PRELOAD
 
 PROOT_ARGS=(
     -0
-    -r
+    -r "${ROOTFS}"
     -b /dev
     -b /proc
     -b /sys
     -b "${UBUNTU_HOME}:/ubuntu"
     -b /data/data/com.termux/files/usr/tmp:/tmp
     -w /root
-    "${ROOTFS}"
 )
 
 # Add Android system paths if available (needed on some devices)
