@@ -144,8 +144,8 @@ echo ""
 
 export DEBIAN_FRONTEND=noninteractive
 
-${SUDO} apt-get update -y
-${SUDO} apt-get upgrade -y
+${SUDO} apt-get update -y --allow-unauthenticated
+${SUDO} apt-get upgrade -y --allow-unauthenticated
 
 # ============================================================================
 # PHASE 2: Install Dependencies
@@ -174,7 +174,7 @@ DEPS=(
     libgl1-mesa-dri
 )
 
-${SUDO} apt-get install -y "${DEPS[@]}"
+${SUDO} apt-get install -y --allow-unauthenticated "${DEPS[@]}"
 
 # ============================================================================
 # PHASE 3: Install KDE Plasma Core
@@ -187,7 +187,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Install KDE Plasma desktop
-${SUDO} apt-get install -y \
+${SUDO} apt-get install -y --allow-unauthenticated \
     kde-plasma-desktop \
     plasma-workspace \
     kwin-x11 \
@@ -221,7 +221,7 @@ KDE_APPS=(
     kinfocenter
 )
 
-${SUDO} apt-get install -y "${KDE_APPS[@]}" || {
+${SUDO} apt-get install -y --allow-unauthenticated "${KDE_APPS[@]}" || {
     echo "Some KDE apps failed to install. Continuing..."
 }
 
@@ -338,7 +338,7 @@ chown -R 1000:1000 /home/droid/.config 2>/dev/null || true
 
 echo ""
 echo "Cleaning up..."
-${SUDO} apt-get autoremove -y
+${SUDO} apt-get autoremove -y --allow-unauthenticated
 ${SUDO} apt-get clean
 
 # ============================================================================

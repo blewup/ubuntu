@@ -53,17 +53,15 @@ proot_build_binds() {
     echo "${binds}"
 }
 
-# Build environment variables as proot --env flags
 # Build environment variables using proot's native --env= flags
 proot_build_env() {
     local display="${1:-:1}"
-    local home_dir="${2:-${PROOT_HOME_TARGET}}"
+    local home_dir="${2:-/root}"
     
     local env=""
     env+=" --env=HOME=${home_dir}"
-    env+=" --env=HOME=${PROOT_HOME_TARGET}"
-    env+=" --env=USER=droid"
-    env+=" --env=LOGNAME=droid"
+    env+=" --env=USER=root"
+    env+=" --env=LOGNAME=root"
     env+=" --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     env+=" --env=TERM=${TERM:-xterm-256color}"
     env+=" --env=LANG=C.UTF-8"
@@ -72,7 +70,8 @@ proot_build_env() {
     env+=" --env=SHELL=/bin/bash"
     env+=" --env=DISPLAY=${display}"
     env+=" --env=PULSE_SERVER=tcp:127.0.0.1:4713"
-    env+=" --env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
+    env+=" --env=XDG_RUNTIME_DIR=/tmp/runtime-root"
+    env+=" --env=PROOT_ACTIVE=1"
     
     echo "${env}"
 }
@@ -81,11 +80,8 @@ proot_build_env() {
 proot_get_working_dir() {
     local rootfs="${1:-${PROOT_UBUNTU_ROOT}}"
     
-    # Prefer /home/droid if it exists in rootfs
-    if [[ -d "${rootfs}${PROOT_HOME_TARGET}" ]]; then
-        echo "${PROOT_HOME_TARGET}"
-    # Fallback to /root
-    elif [[ -d "${rootfs}/root" ]]; then
+    # Default to /root
+    if [[ -d "${rootfs}/root" ]]; then
         echo "/root"
     # Ultimate fallback
     else
@@ -103,18 +99,11 @@ proot_build_command() {
     work_dir=$(proot_get_working_dir "${rootfs}")
     
     local cmd="proot"
-    cmd+=" --link2symlink"
-    cmd+=" --kill-on-exit"
-    cmd+=" --root-id"
-    cmd+=" --rootfs=${rootfs}"
-    cmd+=" --cwd=${work_dir}"
-    cmd+=" --pwd=${work_dir}"
+    cmd+=" -0"
+    cmd+=" -r ${rootfs}"
+    cmd+=" -w ${work_dir}"
     cmd+="$(proot_build_binds "${rootfs}")"
     cmd+="$(proot_build_env "${display}" "${work_dir}")"
-    cmd+=" --cwd=${PROOT_HOME_TARGET}"
-    cmd+=" --pwd=${PROOT_HOME_TARGET}"
-    cmd+="$(proot_build_binds)"
-    cmd+="$(proot_build_env "${display}")"
     
     echo "${cmd}"
 }
@@ -185,8 +174,6 @@ proot_get_pids() {
 # ============================================================================
 
 export PROOT_UBUNTU_ROOT PROOT_HOME_BIND PROOT_HOME_TARGET
-export -f proot_build_binds proot_build_env proot_build_command
-export -f proot_prepare_env proot_run proot_shell proot_check
 export -f proot_build_binds proot_build_env proot_get_working_dir proot_build_command
-export -f proot_run proot_shell proot_check
+export -f proot_prepare_env proot_run proot_shell proot_check
 export -f proot_kill_all proot_is_running proot_get_pids

@@ -903,6 +903,14 @@ main() {
     create_proot_fixes
     create_first_boot_script
     
+    # Apply rootfs fixes for proot compatibility
+    log_section "Applying PRoot Compatibility Fixes"
+    if [[ -x "${SCRIPT_DIR}/fix-rootfs.sh" ]]; then
+        bash "${SCRIPT_DIR}/fix-rootfs.sh"
+    else
+        log_warn "fix-rootfs.sh not found, skipping advanced fixes"
+    fi
+    
     # Verify
     if verify_extraction; then
         print_footer "success" "Ubuntu rootfs extraction completed successfully"
