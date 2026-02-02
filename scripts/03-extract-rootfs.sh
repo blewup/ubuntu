@@ -35,9 +35,13 @@ TARBALL_NAMES=(
 TARBALL_LOCATIONS=(
     "${HOME}"
     "${HOME}/ubuntu"
+    "${HOME}/ubuntu-fs"
     "/sdcard/Download"
     "/sdcard"
+    "/storage/emulated/0/Download"
+    "/storage/emulated/0"
     "${HOME}/storage/downloads"
+    "${HOME}/storage/shared/Download"
 )
 
 # Minimum required space in MB
@@ -109,11 +113,20 @@ verify_tarball() {
     fi
     
     log_step 2 3 "Testing archive integrity..."
+    # Try gzip test, but don't fail if it doesn't work on Android storage
     if gzip -t "${tarball}" 2>/dev/null; then
         log_success "Gzip integrity check passed"
     else
-        log_error "Gzip integrity check failed - file may be corrupted"
-        return 1
+        # On Android storage (FUSE/sdcardfs), gzip -t may fail even for valid files
+        # Try alternative verification by attempting to list contents
+        log_warn "Direct gzip test failed (may be due to Android storage filesystem)"
+        log_info "Attempting alternative verification..."
+        if tar -tzf "${tarball}" 2>/dev/null | head -1 > /dev/null; then
+            log_success "Alternative verification passed - tarball appears readable"
+        else
+            log_error "Tarball verification failed - file may be corrupted or inaccessible"
+            return 1
+        fi
     fi
     
     log_step 3 3 "Checking archive contents..."

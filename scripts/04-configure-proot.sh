@@ -235,6 +235,33 @@ pre_launch_checks() {
         exit 1
     fi
     
+    # Check essential binaries exist in rootfs
+    local essential_bins=(
+        "/usr/bin/env"
+        "/bin/bash"
+        "/bin/sh"
+    )
+    local missing_bins=()
+    
+    for bin in "${essential_bins[@]}"; do
+        if [[ ! -x "${UBUNTU_ROOTFS}${bin}" ]] && [[ ! -f "${UBUNTU_ROOTFS}${bin}" ]]; then
+            missing_bins+=("${bin}")
+        fi
+    done
+    
+    if [[ ${#missing_bins[@]} -gt 0 ]]; then
+        echo "${COLOR_ERROR}Error: Ubuntu rootfs appears incomplete or corrupted${COLOR_RESET}"
+        echo "Missing essential binaries:"
+        for bin in "${missing_bins[@]}"; do
+            echo "  - ${bin}"
+        done
+        echo ""
+        echo "The rootfs extraction may have failed. Please:"
+        echo "  1. Remove the incomplete rootfs: rm -rf ${UBUNTU_ROOTFS}"
+        echo "  2. Re-run the extraction: bash ~/ubuntu/scripts/03-extract-rootfs.sh"
+        exit 1
+    fi
+    
     # Check proot is available
     if ! command -v proot &>/dev/null; then
         echo "${COLOR_ERROR}Error: proot not found. Install with: pkg install proot${COLOR_RESET}"
