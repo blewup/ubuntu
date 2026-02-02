@@ -26,53 +26,51 @@ proot_build_binds() {
     local binds=""
     
     # Essential system mounts
-    binds+=" --bind=/dev"
-    binds+=" --bind=/dev/urandom:/dev/random"
-    binds+=" --bind=/proc"
-    binds+=" --bind=/sys"
+    binds+=" -b /dev"
+    binds+=" -b /dev/urandom:/dev/random"
+    binds+=" -b /proc"
+    binds+=" -b /sys"
     
     # Termux tmp
-    binds+=" --bind=/data/data/com.termux/files/usr/tmp:/tmp"
+    binds+=" -b /data/data/com.termux/files/usr/tmp:/tmp"
     
     # User data - only bind /sdcard:/home/droid if /home/droid exists in rootfs
     if [[ -d "${rootfs}${PROOT_HOME_TARGET}" ]]; then
-        binds+=" --bind=${PROOT_HOME_BIND}:${PROOT_HOME_TARGET}"
+        binds+=" -b ${PROOT_HOME_BIND}:${PROOT_HOME_TARGET}"
     fi
-    binds+=" --bind=/sdcard"
-    binds+=" --bind=/storage"
+    binds+=" -b /sdcard"
+    binds+=" -b /storage"
     
     # GPU devices (if accessible)
-    [[ -e "/dev/kgsl-3d0" ]] && binds+=" --bind=/dev/kgsl-3d0"
-    [[ -d "/dev/dri" ]] && binds+=" --bind=/dev/dri"
-    [[ -e "/dev/ion" ]] && binds+=" --bind=/dev/ion"
+    [[ -e "/dev/kgsl-3d0" ]] && binds+=" -b /dev/kgsl-3d0"
+    [[ -d "/dev/dri" ]] && binds+=" -b /dev/dri"
+    [[ -e "/dev/ion" ]] && binds+=" -b /dev/ion"
     
     # Android system paths (needed on some devices)
-    [[ -d "/system" ]] && binds+=" --bind=/system"
-    [[ -d "/apex" ]] && binds+=" --bind=/apex"
+    [[ -d "/system" ]] && binds+=" -b /system"
+    [[ -d "/apex" ]] && binds+=" -b /apex"
     
     echo "${binds}"
 }
 
-# Build environment variables as proot --env flags
-# Build environment variables using proot's native --env= flags
+# Build environment variables using proot's native -e flags
 proot_build_env() {
     local display="${1:-:1}"
     local home_dir="${2:-${PROOT_HOME_TARGET}}"
     
     local env=""
-    env+=" --env=HOME=${home_dir}"
-    env+=" --env=HOME=${PROOT_HOME_TARGET}"
-    env+=" --env=USER=droid"
-    env+=" --env=LOGNAME=droid"
-    env+=" --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    env+=" --env=TERM=${TERM:-xterm-256color}"
-    env+=" --env=LANG=C.UTF-8"
-    env+=" --env=LC_ALL=C.UTF-8"
-    env+=" --env=TMPDIR=/tmp"
-    env+=" --env=SHELL=/bin/bash"
-    env+=" --env=DISPLAY=${display}"
-    env+=" --env=PULSE_SERVER=tcp:127.0.0.1:4713"
-    env+=" --env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
+    env+=" -e HOME=${home_dir}"
+    env+=" -e USER=droid"
+    env+=" -e LOGNAME=droid"
+    env+=" -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    env+=" -e TERM=${TERM:-xterm-256color}"
+    env+=" -e LANG=C.UTF-8"
+    env+=" -e LC_ALL=C.UTF-8"
+    env+=" -e TMPDIR=/tmp"
+    env+=" -e SHELL=/bin/bash"
+    env+=" -e DISPLAY=${display}"
+    env+=" -e PULSE_SERVER=tcp:127.0.0.1:4713"
+    env+=" -e XDG_RUNTIME_DIR=/tmp/runtime-droid"
     
     echo "${env}"
 }
@@ -105,16 +103,11 @@ proot_build_command() {
     local cmd="proot"
     cmd+=" --link2symlink"
     cmd+=" --kill-on-exit"
-    cmd+=" --root-id"
-    cmd+=" --rootfs=${rootfs}"
-    cmd+=" --cwd=${work_dir}"
-    cmd+=" --pwd=${work_dir}"
+    cmd+=" -0"
+    cmd+=" -r ${rootfs}"
+    cmd+=" -w ${work_dir}"
     cmd+="$(proot_build_binds "${rootfs}")"
     cmd+="$(proot_build_env "${display}" "${work_dir}")"
-    cmd+=" --cwd=${PROOT_HOME_TARGET}"
-    cmd+=" --pwd=${PROOT_HOME_TARGET}"
-    cmd+="$(proot_build_binds)"
-    cmd+="$(proot_build_env "${display}")"
     
     echo "${cmd}"
 }
