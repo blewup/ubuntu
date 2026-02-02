@@ -51,14 +51,23 @@ UBUNTU_HOME_TARGET="/home/droid"
 # PROOT BASE ARGUMENTS
 # ============================================================================
 
+# Determine working directory based on what exists
+proot_get_cwd() {
+    if [[ -d "${UBUNTU_ROOTFS}/home/droid" ]]; then
+        echo "/home/droid"
+    elif [[ -d "${UBUNTU_ROOTFS}/root" ]]; then
+        echo "/root"
+    else
+        echo "/"
+    fi
+}
+
 # Core proot options
 PROOT_CORE_ARGS=(
     "--link2symlink"           # Handle symlinks properly
     "--kill-on-exit"           # Clean up child processes on exit
     "--root-id"                # Fake root user (uid 0)
     "--rootfs=${UBUNTU_ROOTFS}"
-    "--cwd=${UBUNTU_HOME_TARGET}"
-    "--pwd=${UBUNTU_HOME_TARGET}"
 )
 
 # ============================================================================
@@ -107,21 +116,21 @@ for heap in /dev/dma_heap/*; do
 done
 
 # ============================================================================
-# ENVIRONMENT VARIABLES
+# ENVIRONMENT VARIABLES (as --env= flags for proot)
 # ============================================================================
 
-PROOT_ENV_VARS=(
-    "HOME=${UBUNTU_HOME_TARGET}"
-    "USER=droid"
-    "LOGNAME=droid"
-    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    "TERM=${TERM:-xterm-256color}"
-    "LANG=C.UTF-8"
-    "LC_ALL=C.UTF-8"
-    "TMPDIR=/tmp"
-    "SHELL=/bin/bash"
-    "DISPLAY=${DISPLAY:-:1}"
-    "PULSE_SERVER=tcp:127.0.0.1:4713"
+PROOT_ENV_ARGS=(
+    "--env=HOME=${UBUNTU_HOME_TARGET}"
+    "--env=USER=droid"
+    "--env=LOGNAME=droid"
+    "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    "--env=TERM=${TERM:-xterm-256color}"
+    "--env=LANG=C.UTF-8"
+    "--env=LC_ALL=C.UTF-8"
+    "--env=TMPDIR=/tmp"
+    "--env=SHELL=/bin/bash"
+    "--env=DISPLAY=${DISPLAY:-:1}"
+    "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
 )
 
 # ============================================================================
@@ -153,6 +162,7 @@ build_bind_args() {
 
 # Build environment arguments using proot's native --env= flags
 build_env_args() {
+    echo "${PROOT_ENV_ARGS[*]}"
     local args=""
     for env in "${PROOT_ENV_VARS[@]}"; do
         args+=" --env=${env}"
@@ -164,7 +174,10 @@ build_env_args() {
 build_proot_command() {
     local shell="${1:-/bin/bash}"
     local login="${2:---login}"
+    local cwd
+    cwd=$(proot_get_cwd)
     
+    echo "proot ${PROOT_CORE_ARGS[*]} --cwd=${cwd} $(build_bind_args) $(build_env_args) ${shell} ${login}"
     echo "proot ${PROOT_CORE_ARGS[*]} $(build_bind_args) $(build_env_args) ${shell} ${login}"
 }
 EOF
@@ -414,6 +427,14 @@ launch_shell() {
     fi
     echo ""
     
+    # Determine working directory - use /home/droid if it exists, otherwise /root
+    local work_dir="/root"
+    local home_dir="/root"
+    if [[ -d "${UBUNTU_ROOTFS}/home/droid" ]]; then
+        work_dir="/home/droid"
+        home_dir="/home/droid"
+    fi
+    
     # Build and execute proot command
     local proot_args=(
         "proot"
@@ -421,17 +442,31 @@ launch_shell() {
         "--kill-on-exit"
         "--root-id"
         "--rootfs=${UBUNTU_ROOTFS}"
-        "--cwd=/home/droid"
-        "--pwd=/home/droid"
+        "--cwd=${work_dir}"
+        "--pwd=${work_dir}"
         "--bind=/dev"
         "--bind=/dev/urandom:/dev/random"
         "--bind=/proc"
         "--bind=/sys"
         "--bind=/data/data/com.termux/files/usr/tmp:/tmp"
-        "--bind=/sdcard:/home/droid"
         "--bind=/sdcard"
         "--bind=/storage"
+        "--env=HOME=${home_dir}"
+        "--env=USER=droid"
+        "--env=LOGNAME=droid"
+        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        "--env=TERM=${TERM:-xterm-256color}"
+        "--env=LANG=C.UTF-8"
+        "--env=LC_ALL=C.UTF-8"
+        "--env=TMPDIR=/tmp"
+        "--env=SHELL=/bin/bash"
+        "--env=DISPLAY=:${VNC_DISPLAY}"
+        "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
+        "--env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
     )
+    
+    # Add /home/droid bind only if directory exists
+    [[ -d "${UBUNTU_ROOTFS}/home/droid" ]] && proot_args+=("--bind=/sdcard:/home/droid")
     
     # Add GPU binds if available
     [[ -e "/dev/kgsl-3d0" ]] && proot_args+=("--bind=/dev/kgsl-3d0")
@@ -455,10 +490,10 @@ launch_shell() {
     
     if [[ -n "${cmd}" ]]; then
         # Run single command
-        "${proot_args[@]}" "${env_args[@]}" /bin/bash -c "${cmd}"
+        "${proot_args[@]}" /bin/bash -c "${cmd}"
     else
         # Interactive shell
-        "${proot_args[@]}" "${env_args[@]}" /bin/bash --login
+        "${proot_args[@]}" /bin/bash --login
     fi
     
     local exit_code=$?
