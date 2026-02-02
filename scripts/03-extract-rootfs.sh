@@ -47,9 +47,58 @@ TARBALL_LOCATIONS=(
 # Minimum required space in MB
 MIN_SPACE_MB=8000
 
+# Download URL for Ubuntu 26.04 Resolute ARM64 base image
+ROOTFS_DOWNLOAD_URL="https://cdimage.ubuntu.com/ubuntu-base/daily/pending/resolute-base-arm64.tar.gz"
+ROOTFS_FILENAME="resolute-base-arm64.tar.gz"
+ROOTFS_DOWNLOAD_PATH="${HOME}/${ROOTFS_FILENAME}"
+
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
+
+download_rootfs() {
+    log_section "Downloading Ubuntu Rootfs"
+    
+    local target="${ROOTFS_DOWNLOAD_PATH}"
+    
+    log_info "Downloading Ubuntu 26.04 (Resolute) ARM64 base image..."
+    log_info "URL: ${ROOTFS_DOWNLOAD_URL}"
+    log_info "Target: ${target}"
+    echo ""
+    
+    # Check if curl or wget is available
+    if command_exists curl; then
+        log_info "Using curl for download..."
+        if curl -L --progress-bar -o "${target}" "${ROOTFS_DOWNLOAD_URL}"; then
+            local size
+            size=$(du -h "${target}" | cut -f1)
+            log_success "Download complete! Size: ${size}"
+            echo "${target}"
+            return 0
+        else
+            log_error "Download failed with curl"
+            rm -f "${target}" 2>/dev/null
+            return 1
+        fi
+    elif command_exists wget; then
+        log_info "Using wget for download..."
+        if wget --progress=bar:force -O "${target}" "${ROOTFS_DOWNLOAD_URL}"; then
+            local size
+            size=$(du -h "${target}" | cut -f1)
+            log_success "Download complete! Size: ${size}"
+            echo "${target}"
+            return 0
+        else
+            log_error "Download failed with wget"
+            rm -f "${target}" 2>/dev/null
+            return 1
+        fi
+    else
+        log_error "Neither curl nor wget is available"
+        log_info "Please install curl: pkg install curl"
+        return 1
+    fi
+}
 
 find_tarball() {
     log_section "Locating Ubuntu Rootfs Tarball"
@@ -81,18 +130,31 @@ find_tarball() {
         echo "${found}"
         return 0
     else
-        log_error "Ubuntu rootfs tarball not found!"
+        log_warn "Ubuntu rootfs tarball not found locally"
         echo ""
-        echo "Please download the Ubuntu 26.04 (Resolute) ARM64 base image:"
-        echo "  URL: https://cdimage.ubuntu.com/ubuntu-base/releases/26.04/release/"
-        echo "  File: ubuntu-base-26.04-base-arm64.tar.gz"
-        echo ""
-        echo "Place the file in one of these locations:"
-        for loc in "${TARBALL_LOCATIONS[@]}"; do
-            echo "  - ${loc}/"
-        done
-        echo ""
-        return 1
+        
+        # Offer to download automatically
+        if confirm "Would you like to download the rootfs automatically? (~34MB)" "y"; then
+            local downloaded
+            downloaded=$(download_rootfs)
+            if [[ -n "${downloaded}" ]] && [[ -f "${downloaded}" ]]; then
+                echo "${downloaded}"
+                return 0
+            else
+                log_error "Download failed"
+                return 1
+            fi
+        else
+            log_info "You can manually download the rootfs from:"
+            echo "  URL: ${ROOTFS_DOWNLOAD_URL}"
+            echo ""
+            echo "Or place a tarball in one of these locations:"
+            for loc in "${TARBALL_LOCATIONS[@]}"; do
+                echo "  - ${loc}/"
+            done
+            echo ""
+            return 1
+        fi
     fi
 }
 
