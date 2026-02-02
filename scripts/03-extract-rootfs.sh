@@ -205,28 +205,19 @@ verify_tarball() {
             log_success "Partial read verification passed"
             verification_passed=true
         else
-            log_info "Partial read test inconclusive, checking file size..."
+            log_info "Partial read test inconclusive"
         fi
     fi
     
-    # Method 4: Last resort - check file size (valid Ubuntu base is typically > 20MB)
+    # Fail if no verification method passed
     if [[ "${verification_passed}" != "true" ]]; then
         local file_size
         file_size=$(stat -c%s "${tarball}" 2>/dev/null || stat -f%z "${tarball}" 2>/dev/null || echo "0")
-        local min_size=20000000
-        if [[ ${file_size} -gt ${min_size} ]]; then
-            log_warn "Cannot fully verify tarball integrity (Android storage limitation)"
-            log_info "File size (${file_size} bytes) suggests valid Ubuntu rootfs"
-            log_info "Proceeding with extraction - will verify after extraction"
-            verification_passed=true
-        else
-            log_error "Tarball verification failed: file appears to be corrupted or too small"
-            log_error "  Current file size: ${file_size} bytes"
-            log_error "  Minimum expected:  ${min_size} bytes (~20MB)"
-            log_info "The tarball may have been incompletely downloaded or corrupted."
-            log_info "Please try re-downloading the rootfs tarball."
-            return 1
-        fi
+        log_error "Tarball verification failed: file appears to be corrupted"
+        log_error "  Current file size: ${file_size} bytes"
+        log_info "The tarball may have been incompletely downloaded or corrupted."
+        log_info "Please try re-downloading the rootfs tarball."
+        return 1
     fi
     
     log_step 3 3 "Checking archive contents..."
@@ -251,7 +242,7 @@ verify_tarball() {
             return 1
         fi
     else
-        # Cannot list contents but file passed size check
+        # Cannot list contents but integrity check passed
         log_warn "Cannot verify archive contents (Android storage limitation)"
         log_info "Will verify rootfs structure after extraction"
         return 0
