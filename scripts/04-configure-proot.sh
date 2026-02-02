@@ -44,54 +44,38 @@ create_proot_config() {
 # ============================================================================
 
 UBUNTU_ROOTFS="${HOME}/ubuntu/rootfs"
-UBUNTU_HOME_BIND="/sdcard"
-UBUNTU_HOME_TARGET="/home/droid"
 
 # ============================================================================
-# PROOT BASE ARGUMENTS
+# PROOT BASE ARGUMENTS (short form)
 # ============================================================================
 
-# Determine working directory based on what exists
-proot_get_cwd() {
-    if [[ -d "${UBUNTU_ROOTFS}/home/droid" ]]; then
-        echo "/home/droid"
-    elif [[ -d "${UBUNTU_ROOTFS}/root" ]]; then
-        echo "/root"
-    else
-        echo "/"
-    fi
-}
-
-# Core proot options
+# Core proot options using short flags
 PROOT_CORE_ARGS=(
-    "--link2symlink"           # Handle symlinks properly
-    "--kill-on-exit"           # Clean up child processes on exit
-    "--root-id"                # Fake root user (uid 0)
-    "--rootfs=${UBUNTU_ROOTFS}"
+    "-0"                           # Fake root user (uid 0)
+    "-r" "${UBUNTU_ROOTFS}"        # Root filesystem
+    "-w" "/root"                   # Working directory
 )
 
 # ============================================================================
-# BIND MOUNTS
+# BIND MOUNTS (short form)
 # ============================================================================
 
 # Essential system mounts
 PROOT_SYSTEM_BINDS=(
-    "/dev"
-    "/dev/urandom:/dev/random"
-    "/proc"
-    "/sys"
+    "-b" "/dev"
+    "-b" "/proc"
+    "-b" "/sys"
 )
 
 # Termux integration
 PROOT_TERMUX_BINDS=(
-    "/data/data/com.termux/files/usr/tmp:/tmp"
+    "-b" "/data/data/com.termux/files/usr/tmp:/tmp"
 )
 
 # User data mounts
 PROOT_USER_BINDS=(
-    "${UBUNTU_HOME_BIND}:${UBUNTU_HOME_TARGET}"
-    "/sdcard"
-    "/storage"
+    "-b" "/sdcard"
+    "-b" "/storage"
 )
 
 # GPU device mounts (added if accessible)
@@ -99,39 +83,20 @@ PROOT_GPU_BINDS=()
 
 # Check for Adreno GPU device
 if [[ -e "/dev/kgsl-3d0" ]]; then
-    PROOT_GPU_BINDS+=("/dev/kgsl-3d0")
+    PROOT_GPU_BINDS+=("-b" "/dev/kgsl-3d0")
 fi
 
 # Check for DRI devices
 if [[ -d "/dev/dri" ]]; then
-    for dri_dev in /dev/dri/*; do
-        [[ -e "${dri_dev}" ]] && PROOT_GPU_BINDS+=("${dri_dev}")
-    done
+    PROOT_GPU_BINDS+=("-b" "/dev/dri")
 fi
 
 # Check for ion/dma-heap (memory allocators)
-[[ -e "/dev/ion" ]] && PROOT_GPU_BINDS+=("/dev/ion")
-for heap in /dev/dma_heap/*; do
-    [[ -e "${heap}" ]] && PROOT_GPU_BINDS+=("${heap}")
-done
+[[ -e "/dev/ion" ]] && PROOT_GPU_BINDS+=("-b" "/dev/ion")
 
-# ============================================================================
-# ENVIRONMENT VARIABLES (as --env= flags for proot)
-# ============================================================================
-
-PROOT_ENV_ARGS=(
-    "--env" "HOME=${UBUNTU_HOME_TARGET}"
-    "--env" "USER=droid"
-    "--env" "LOGNAME=droid"
-    "--env" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    "--env" "TERM=${TERM:-xterm-256color}"
-    "--env" "LANG=C.UTF-8"
-    "--env" "LC_ALL=C.UTF-8"
-    "--env" "TMPDIR=/tmp"
-    "--env" "SHELL=/bin/bash"
-    "--env" "DISPLAY=${DISPLAY:-:1}"
-    "--env" "PULSE_SERVER=tcp:127.0.0.1:4713"
-)
+# Android system paths (needed on some devices)
+[[ -d "/system" ]] && PROOT_SYSTEM_BINDS+=("-b" "/system")
+[[ -d "/apex" ]] && PROOT_SYSTEM_BINDS+=("-b" "/apex")
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -139,46 +104,14 @@ PROOT_ENV_ARGS=(
 
 # Build complete bind arguments
 build_bind_args() {
-    local args=""
-    
-    for bind in "${PROOT_SYSTEM_BINDS[@]}"; do
-        args+=" --bind=${bind}"
-    done
-    
-    for bind in "${PROOT_TERMUX_BINDS[@]}"; do
-        args+=" --bind=${bind}"
-    done
-    
-    for bind in "${PROOT_USER_BINDS[@]}"; do
-        args+=" --bind=${bind}"
-    done
-    
-    for bind in "${PROOT_GPU_BINDS[@]}"; do
-        args+=" --bind=${bind}"
-    done
-    
-    echo "${args}"
-}
-
-# Build environment arguments using proot's native --env= flags
-build_env_args() {
-    echo "${PROOT_ENV_ARGS[*]}"
-    local args=""
-    for env in "${PROOT_ENV_VARS[@]}"; do
-        args+=" --env=${env}"
-    done
-    echo "${args}"
+    echo "${PROOT_SYSTEM_BINDS[*]} ${PROOT_TERMUX_BINDS[*]} ${PROOT_USER_BINDS[*]} ${PROOT_GPU_BINDS[*]}"
 }
 
 # Build complete proot command
 build_proot_command() {
     local shell="${1:-/bin/bash}"
-    local login="${2:---login}"
-    local cwd
-    cwd=$(proot_get_cwd)
     
-    echo "proot ${PROOT_CORE_ARGS[*]} --cwd=${cwd} $(build_bind_args) $(build_env_args) ${shell} ${login}"
-    echo "proot ${PROOT_CORE_ARGS[*]} $(build_bind_args) $(build_env_args) ${shell} ${login}"
+    echo "proot ${PROOT_CORE_ARGS[*]} $(build_bind_args) ${shell}"
 }
 EOF
 
