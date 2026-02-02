@@ -114,10 +114,8 @@ verify_tarball() {
     
     log_step 2 3 "Testing archive integrity..."
     # Try gzip test, but don't fail if it doesn't work on Android storage
-    local gzip_passed=false
     if gzip -t "${tarball}" 2>/dev/null; then
         log_success "Gzip integrity check passed"
-        gzip_passed=true
     else
         # On Android storage (FUSE/sdcardfs), gzip -t may fail even for valid files
         # Try alternative verification by attempting to list contents
@@ -125,7 +123,6 @@ verify_tarball() {
         log_info "Attempting alternative verification..."
         if tar -tzf "${tarball}" 2>/dev/null | head -1 > /dev/null; then
             log_success "Alternative verification passed - tarball appears readable"
-            gzip_passed=true
         else
             log_error "Tarball verification failed - file may be corrupted or inaccessible"
             return 1

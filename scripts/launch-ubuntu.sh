@@ -59,6 +59,7 @@ check_rootfs() {
     # Check essential binaries exist
     local essential_bins=(
         "/bin/bash"
+        "/bin/sh"
         "/usr/bin/env"
     )
     local missing=()
