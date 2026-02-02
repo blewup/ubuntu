@@ -171,6 +171,46 @@ dir_writable() {
     [[ -d "$1" ]] && [[ -w "$1" ]]
 }
 
+# Get human-readable file size
+# Uses stat (works on Android FUSE storage) with fallback to du
+# This is more reliable than du -h on Android's FUSE/sdcardfs filesystems
+get_file_size_human() {
+    local file="$1"
+    local size_bytes=""
+    
+    # Size unit thresholds
+    local KB=1024
+    local MB=$((1024 * 1024))
+    local GB=$((1024 * 1024 * 1024))
+
+    # Try Linux stat first (more reliable on Android storage)
+    if size_bytes=$(stat -c%s "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
+        : # Success - size_bytes is set
+    # Try BSD/macOS stat
+    elif size_bytes=$(stat -f%z "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
+        : # Success - size_bytes is set
+    # Fallback to wc if stat fails completely
+    elif size_bytes=$(wc -c < "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
+        # wc may include whitespace, remove all whitespace (spaces, tabs, newlines)
+        size_bytes="${size_bytes//[[:space:]]/}"
+    # Last resort: use du
+    else
+        du -h "${file}" 2>/dev/null | cut -f1
+        return
+    fi
+
+    # Convert bytes to human-readable format
+    if [[ ${size_bytes} -ge ${GB} ]]; then
+        echo "$(awk "BEGIN {printf \"%.1fG\", ${size_bytes}/${GB}}")"
+    elif [[ ${size_bytes} -ge ${MB} ]]; then
+        echo "$(awk "BEGIN {printf \"%.1fM\", ${size_bytes}/${MB}}")"
+    elif [[ ${size_bytes} -ge ${KB} ]]; then
+        echo "$(awk "BEGIN {printf \"%.1fK\", ${size_bytes}/${KB}}")"
+    else
+        echo "${size_bytes}B"
+    fi
+}
+
 # Check available storage (in MB)
 available_storage_mb() {
     local path="${1:-${HOME}}"
@@ -528,7 +568,7 @@ print_footer() {
 export -f log_info log_success log_warn log_error log_debug log_section log_step
 export -f spinner progress_bar
 export -f is_termux command_exists pkg_installed file_readable dir_writable
-export -f available_storage_mb network_available url_reachable
+export -f get_file_size_human available_storage_mb network_available url_reachable
 export -f download_file safe_copy ensure_dir backup_file
 export -f pkg_update pkg_install
 export -f proot_cmd proot_exec
