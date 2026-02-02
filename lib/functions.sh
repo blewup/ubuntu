@@ -177,6 +177,11 @@ dir_writable() {
 get_file_size_human() {
     local file="$1"
     local size_bytes=""
+    
+    # Size unit thresholds
+    local KB=1024
+    local MB=$((1024 * 1024))
+    local GB=$((1024 * 1024 * 1024))
 
     # Try Linux stat first (more reliable on Android storage)
     if size_bytes=$(stat -c%s "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
@@ -186,7 +191,7 @@ get_file_size_human() {
         : # Success - size_bytes is set
     # Fallback to wc if stat fails completely
     elif size_bytes=$(wc -c < "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
-        # wc may include leading whitespace, trim it
+        # wc may include whitespace, remove all whitespace
         size_bytes="${size_bytes// /}"
     # Last resort: use du
     else
@@ -195,15 +200,12 @@ get_file_size_human() {
     fi
 
     # Convert bytes to human-readable format
-    if [[ ${size_bytes} -ge 1073741824 ]]; then
-        # GB
-        echo "$(awk "BEGIN {printf \"%.1fG\", ${size_bytes}/1073741824}")"
-    elif [[ ${size_bytes} -ge 1048576 ]]; then
-        # MB
-        echo "$(awk "BEGIN {printf \"%.1fM\", ${size_bytes}/1048576}")"
-    elif [[ ${size_bytes} -ge 1024 ]]; then
-        # KB
-        echo "$(awk "BEGIN {printf \"%.1fK\", ${size_bytes}/1024}")"
+    if [[ ${size_bytes} -ge ${GB} ]]; then
+        echo "$(awk "BEGIN {printf \"%.1fG\", ${size_bytes}/${GB}}")"
+    elif [[ ${size_bytes} -ge ${MB} ]]; then
+        echo "$(awk "BEGIN {printf \"%.1fM\", ${size_bytes}/${MB}}")"
+    elif [[ ${size_bytes} -ge ${KB} ]]; then
+        echo "$(awk "BEGIN {printf \"%.1fK\", ${size_bytes}/${KB}}")"
     else
         echo "${size_bytes}B"
     fi
