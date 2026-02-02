@@ -191,8 +191,8 @@ get_file_size_human() {
         : # Success - size_bytes is set
     # Fallback to wc if stat fails completely
     elif size_bytes=$(wc -c < "${file}" 2>/dev/null) && [[ -n "${size_bytes}" ]]; then
-        # wc may include whitespace, remove all whitespace
-        size_bytes="${size_bytes// /}"
+        # wc may include whitespace, remove all whitespace (spaces, tabs, newlines)
+        size_bytes="${size_bytes//[[:space:]]/}"
     # Last resort: use du
     else
         du -h "${file}" 2>/dev/null | cut -f1
