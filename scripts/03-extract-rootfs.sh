@@ -71,7 +71,7 @@ download_rootfs() {
         log_info "Using curl for download..."
         if curl -L --progress-bar -o "${target}" "${ROOTFS_DOWNLOAD_URL}"; then
             local size
-            size=$(du -h "${target}" | cut -f1)
+            size=$(get_file_size_human "${target}")
             log_success "Download complete! Size: ${size}"
             echo "${target}"
             return 0
@@ -84,7 +84,7 @@ download_rootfs() {
         log_info "Using wget for download..."
         if wget --progress=bar:force -O "${target}" "${ROOTFS_DOWNLOAD_URL}"; then
             local size
-            size=$(du -h "${target}" | cut -f1)
+            size=$(get_file_size_human "${target}")
             log_success "Download complete! Size: ${size}"
             echo "${target}"
             return 0
@@ -125,7 +125,7 @@ find_tarball() {
     
     if [[ -n "${found}" ]]; then
         local size
-        size=$(du -h "${found}" | cut -f1)
+        size=$(get_file_size_human "${found}")
         log_success "Found tarball: ${found} (${size})"
         echo "${found}"
         return 0

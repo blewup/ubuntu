@@ -206,7 +206,7 @@ check_required_files() {
     
     if [[ -n "${tarball_found}" ]]; then
         local tarball_size
-        tarball_size=$(du -h "${tarball_found}" | cut -f1)
+        tarball_size=$(get_file_size_human "${tarball_found}")
         log_success "Ubuntu tarball found: ${tarball_found} (${tarball_size})"
     else
         log_warn "Ubuntu rootfs tarball not found in expected locations:"
