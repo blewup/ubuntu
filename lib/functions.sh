@@ -407,6 +407,19 @@ proot_cmd() {
         "--env=HOME=${work_dir}" \
         "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
         "--env=TERM=${TERM:-xterm-256color}" \
+        "--bind=/dev" \
+        "--bind=/dev/urandom:/dev/random" \
+        "--bind=/proc" \
+        "--bind=/sys" \
+        "--bind=/data/data/com.termux/files/usr/tmp:/tmp" \
+        "--bind=${UBUNTU_HOME_BIND}:${UBUNTU_HOME_TARGET}" \
+        "--bind=/sdcard" \
+        "--bind=/storage" \
+        "--cwd=${UBUNTU_HOME_TARGET}" \
+        "--pwd=${UBUNTU_HOME_TARGET}" \
+        "--env=HOME=${UBUNTU_HOME_TARGET}" \
+        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+        "--env=TERM=${TERM}" \
         "--env=LANG=C.UTF-8" \
         "--env=TMPDIR=/tmp"
 }

@@ -50,12 +50,14 @@ proot_build_binds() {
 }
 
 # Build environment variables as proot --env flags
+# Build environment variables using proot's native --env= flags
 proot_build_env() {
     local display="${1:-:1}"
     local home_dir="${2:-${PROOT_HOME_TARGET}}"
     
     local env=""
     env+=" --env=HOME=${home_dir}"
+    env+=" --env=HOME=${PROOT_HOME_TARGET}"
     env+=" --env=USER=droid"
     env+=" --env=LOGNAME=droid"
     env+=" --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -105,6 +107,10 @@ proot_build_command() {
     cmd+=" --pwd=${work_dir}"
     cmd+="$(proot_build_binds "${rootfs}")"
     cmd+="$(proot_build_env "${display}" "${work_dir}")"
+    cmd+=" --cwd=${PROOT_HOME_TARGET}"
+    cmd+=" --pwd=${PROOT_HOME_TARGET}"
+    cmd+="$(proot_build_binds)"
+    cmd+="$(proot_build_env "${display}")"
     
     echo "${cmd}"
 }

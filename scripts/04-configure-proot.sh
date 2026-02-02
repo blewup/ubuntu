@@ -160,9 +160,14 @@ build_bind_args() {
     echo "${args}"
 }
 
-# Build environment arguments
+# Build environment arguments using proot's native --env= flags
 build_env_args() {
     echo "${PROOT_ENV_ARGS[*]}"
+    local args=""
+    for env in "${PROOT_ENV_VARS[@]}"; do
+        args+=" --env=${env}"
+    done
+    echo "${args}"
 }
 
 # Build complete proot command
@@ -173,6 +178,7 @@ build_proot_command() {
     cwd=$(proot_get_cwd)
     
     echo "proot ${PROOT_CORE_ARGS[*]} --cwd=${cwd} $(build_bind_args) $(build_env_args) ${shell} ${login}"
+    echo "proot ${PROOT_CORE_ARGS[*]} $(build_bind_args) $(build_env_args) ${shell} ${login}"
 }
 EOF
 
@@ -244,7 +250,6 @@ pre_launch_checks() {
     
     # Check essential binaries exist in rootfs
     local essential_bins=(
-        "/usr/bin/env"
         "/bin/bash"
         "/bin/sh"
     )
@@ -466,6 +471,22 @@ launch_shell() {
     # Add GPU binds if available
     [[ -e "/dev/kgsl-3d0" ]] && proot_args+=("--bind=/dev/kgsl-3d0")
     [[ -d "/dev/dri" ]] && proot_args+=("--bind=/dev/dri")
+    
+    # Environment setup using proot's native --env= flags
+    local env_args=(
+        "--env=HOME=/home/droid"
+        "--env=USER=droid"
+        "--env=LOGNAME=droid"
+        "--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        "--env=TERM=${TERM:-xterm-256color}"
+        "--env=LANG=C.UTF-8"
+        "--env=LC_ALL=C.UTF-8"
+        "--env=TMPDIR=/tmp"
+        "--env=SHELL=/bin/bash"
+        "--env=DISPLAY=:${VNC_DISPLAY}"
+        "--env=PULSE_SERVER=tcp:127.0.0.1:4713"
+        "--env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
+    )
     
     if [[ -n "${cmd}" ]]; then
         # Run single command
