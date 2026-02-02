@@ -20,61 +20,39 @@ PROOT_HOME_TARGET="/home/droid"
 # PROOT COMMAND BUILDING
 # ============================================================================
 
-# Build bind mount arguments
+# Build bind mount arguments using short flags
 proot_build_binds() {
     local rootfs="${1:-${PROOT_UBUNTU_ROOT}}"
-    local binds=""
+    local binds=()
     
     # Essential system mounts
-    binds+=" --bind=/dev"
-    binds+=" --bind=/dev/urandom:/dev/random"
-    binds+=" --bind=/proc"
-    binds+=" --bind=/sys"
+    binds+=(-b /dev)
+    binds+=(-b /proc)
+    binds+=(-b /sys)
     
-    # Termux tmp
-    binds+=" --bind=/data/data/com.termux/files/usr/tmp:/tmp"
-    
-    # User data - only bind /sdcard:/home/droid if /home/droid exists in rootfs
-    if [[ -d "${rootfs}${PROOT_HOME_TARGET}" ]]; then
-        binds+=" --bind=${PROOT_HOME_BIND}:${PROOT_HOME_TARGET}"
+    # Tmp directory with proper handling
+    if [[ -d "/data/data/com.termux/files/usr/tmp" ]]; then
+        binds+=(-b /data/data/com.termux/files/usr/tmp:/tmp)
     fi
-    binds+=" --bind=/sdcard"
-    binds+=" --bind=/storage"
     
-    # GPU devices (if accessible)
-    [[ -e "/dev/kgsl-3d0" ]] && binds+=" --bind=/dev/kgsl-3d0"
-    [[ -d "/dev/dri" ]] && binds+=" --bind=/dev/dri"
-    [[ -e "/dev/ion" ]] && binds+=" --bind=/dev/ion"
+    # Storage
+    [[ -d "/sdcard" ]] && binds+=(-b /sdcard)
+    [[ -d "/storage" ]] && binds+=(-b /storage)
+    [[ -d "/storage/emulated/0" ]] && binds+=(-b /storage/emulated/0)
     
-    # Android system paths (needed on some devices)
-    [[ -d "/system" ]] && binds+=" --bind=/system"
-    [[ -d "/apex" ]] && binds+=" --bind=/apex"
+    # GPU devices
+    [[ -e "/dev/kgsl-3d0" ]] && binds+=(-b /dev/kgsl-3d0)
+    [[ -d "/dev/dri" ]] && binds+=(-b /dev/dri)
     
-    echo "${binds}"
+    echo "${binds[@]}"
 }
 
-# Build environment variables as proot --env flags
-# Build environment variables using proot's native --env= flags
+# Environment variables are now configured inside rootfs
+# via /etc/profile.d/termux.sh instead of proot flags
+# This function is kept for compatibility but returns empty
 proot_build_env() {
-    local display="${1:-:1}"
-    local home_dir="${2:-${PROOT_HOME_TARGET}}"
-    
-    local env=""
-    env+=" --env=HOME=${home_dir}"
-    env+=" --env=HOME=${PROOT_HOME_TARGET}"
-    env+=" --env=USER=droid"
-    env+=" --env=LOGNAME=droid"
-    env+=" --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    env+=" --env=TERM=${TERM:-xterm-256color}"
-    env+=" --env=LANG=C.UTF-8"
-    env+=" --env=LC_ALL=C.UTF-8"
-    env+=" --env=TMPDIR=/tmp"
-    env+=" --env=SHELL=/bin/bash"
-    env+=" --env=DISPLAY=${display}"
-    env+=" --env=PULSE_SERVER=tcp:127.0.0.1:4713"
-    env+=" --env=XDG_RUNTIME_DIR=/tmp/runtime-droid"
-    
-    echo "${env}"
+    # Environment is set inside the rootfs, not via proot flags
+    echo ""
 }
 
 # Determine working directory based on what exists in rootfs
@@ -93,7 +71,7 @@ proot_get_working_dir() {
     fi
 }
 
-# Build complete proot command
+# Build complete proot command using short flags
 proot_build_command() {
     local rootfs="${1:-${PROOT_UBUNTU_ROOT}}"
     local display="${2:-:1}"
@@ -105,16 +83,10 @@ proot_build_command() {
     local cmd="proot"
     cmd+=" --link2symlink"
     cmd+=" --kill-on-exit"
-    cmd+=" --root-id"
-    cmd+=" --rootfs=${rootfs}"
-    cmd+=" --cwd=${work_dir}"
-    cmd+=" --pwd=${work_dir}"
+    cmd+=" -0"
+    cmd+=" -r ${rootfs}"
+    cmd+=" -w ${work_dir}"
     cmd+="$(proot_build_binds "${rootfs}")"
-    cmd+="$(proot_build_env "${display}" "${work_dir}")"
-    cmd+=" --cwd=${PROOT_HOME_TARGET}"
-    cmd+=" --pwd=${PROOT_HOME_TARGET}"
-    cmd+="$(proot_build_binds)"
-    cmd+="$(proot_build_env "${display}")"
     
     echo "${cmd}"
 }

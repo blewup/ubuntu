@@ -555,6 +555,28 @@ PROFILEEOF
     
     log_step 5 8 "Setting up profile scripts..."
     
+    # Create environment script for proot (instead of using --env flags)
+    cat > "${rootfs}/etc/profile.d/termux.sh" << 'EOF'
+#!/bin/bash
+# Termux PRoot Environment Configuration
+
+export HOME=/root
+export USER=root
+export TERM=xterm-256color
+export LANG=C.UTF-8
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export DISPLAY=:1
+export PULSE_SERVER=127.0.0.1
+export TMPDIR=/tmp
+export SHELL=/bin/bash
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+
+# Create runtime directory
+mkdir -p "${XDG_RUNTIME_DIR}" 2>/dev/null
+chmod 700 "${XDG_RUNTIME_DIR}" 2>/dev/null
+EOF
+    chmod +x "${rootfs}/etc/profile.d/termux.sh"
+    
     # Global profile additions
     cat > "${rootfs}/etc/profile.d/termux-proot.sh" << 'EOF'
 #!/bin/bash
@@ -897,6 +919,20 @@ verify_extraction() {
 
 main() {
     print_header "${SCRIPT_NAME}" "${SCRIPT_VERSION}"
+    
+    log_section "Verifying Rootfs"
+    
+    # Check if rootfs already exists
+    if [[ ! -d "${UBUNTU_ROOT}" ]]; then
+        die "Ubuntu rootfs not found at ${UBUNTU_ROOT}. Please extract a rootfs tarball there first."
+    fi
+    
+    if [[ ! -d "${UBUNTU_ROOT}/usr" ]] || [[ ! -d "${UBUNTU_ROOT}/etc" ]]; then
+        die "Ubuntu rootfs appears incomplete. Ensure a valid Ubuntu rootfs is extracted at ${UBUNTU_ROOT}"
+    fi
+    
+    log_success "Rootfs found at ${UBUNTU_ROOT}"
+    echo ""
 
     # Configure
     configure_rootfs_basic
@@ -905,7 +941,7 @@ main() {
     
     # Verify
     if verify_extraction; then
-        print_footer "success" "Ubuntu rootfs extraction completed successfully"
+        print_footer "success" "Ubuntu rootfs configuration completed successfully"
         
         echo ""
         echo "Ubuntu 26.04 rootfs is ready at: ${UBUNTU_ROOT}"
@@ -916,7 +952,7 @@ main() {
         
         return 0
     else
-        print_footer "error" "Extraction completed with issues"
+        print_footer "error" "Configuration completed with issues"
         return 1
     fi
 }

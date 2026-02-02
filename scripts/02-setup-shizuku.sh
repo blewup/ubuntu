@@ -42,7 +42,7 @@ check_shizuku_installed() {
     
     log_step 1 3 "Checking if Shizuku app is installed..."
     
-    if pm list packages 2>/dev/null | grep -q "${SHIZUKU_PKG}"; then
+    if command -v pm &>/dev/null && pm list packages 2>/dev/null | grep -q "${SHIZUKU_PKG}"; then
         log_success "Shizuku app is installed"
         
         # Get version
@@ -51,7 +51,7 @@ check_shizuku_installed() {
         log_info "Shizuku version: ${version}"
         return 0
     else
-        log_warn "Shizuku app is not installed"
+        log_warn "Shizuku app is not installed (optional)"
         return 1
     fi
 }
@@ -562,12 +562,17 @@ main() {
     
     # Check if running in Termux
     if ! is_termux; then
-        die "This script must be run in Termux"
+        log_warn "Not running in Termux, skipping Shizuku setup"
+        echo ""
+        echo "Shizuku integration is optional and only works in Termux."
+        echo "You can continue with the Ubuntu installation without Shizuku."
+        echo ""
+        return 0
     fi
     
     # Check if Shizuku is installed
     local shizuku_installed=false
-    if check_shizuku_installed; then
+    if check_shizuku_installed 2>/dev/null; then
         shizuku_installed=true
     fi
     

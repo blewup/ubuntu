@@ -11,45 +11,49 @@
 #
 set -euo pipefail
 
+# Critical environment setup - MUST be at the start
+HOME="/data/data/com.termux/files/home"
+export PROOT_NO_SECCOMP=1
+unset LD_PRELOAD
+
 UBUNTU_HOME="${HOME}/ubuntu"
 ROOTFS="${UBUNTU_HOME}/rootfs"
 LOG_DIR="${UBUNTU_HOME}/logs"
---env HOME=/root
---env USER=root
---env TERM=xterm-256color
---env LANG=en_US.UTF-8
---env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
---env DISPLAY=:1
---env PULSE_SERVER=127.0.0.1
 mkdir -p "${LOG_DIR}"
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
-# Workaround for "Function not implemented" error on some Android kernels
-# PROOT_NO_SECCOMP disables seccomp filtering that can cause syscall failures
-export PROOT_NO_SECCOMP=1
-
-# Unset LD_PRELOAD to avoid conflicts with Termux-exec hook
-unset LD_PRELOAD
-
-PROOT_ARGS=(
+# Build proot command array with short flags
+cmd_array=(
+    proot
     --link2symlink
     --kill-on-exit
-    --root-id
-    --rootfs="${ROOTFS}"
-    --bind=/dev
-    --bind=/proc
-    --bind=/sys
-    --bind="${UBUNTU_HOME}:/ubuntu"
-    --bind=/data/data/com.termux/files/usr/tmp:/tmp
-    --cwd=/root
+    -0
+    -r "${ROOTFS}"
+    -b /dev
+    -b /proc
+    -b /sys
+    -w /root
 )
 
+# Add proper tmp binding with fallback
+if [[ -d "/data/data/com.termux/files/usr/tmp" ]]; then
+    cmd_array+=(-b /data/data/com.termux/files/usr/tmp:/tmp)
+else
+    mkdir -p "${UBUNTU_HOME}/tmp"
+    cmd_array+=(-b "${UBUNTU_HOME}/tmp:/tmp")
+fi
+
+# Add storage access
+[[ -d "/sdcard" ]] && cmd_array+=(-b /sdcard)
+[[ -d "/storage" ]] && cmd_array+=(-b /storage)
+[[ -d "/storage/emulated/0" ]] && cmd_array+=(-b /storage/emulated/0)
+
 # Add Android system paths if available (needed on some devices)
-[[ -d "/system" ]] && PROOT_ARGS+=(--bind=/system)
-[[ -d "/apex" ]] && PROOT_ARGS+=(--bind=/apex)
+[[ -d "/system" ]] && cmd_array+=(-b /system)
+[[ -d "/apex" ]] && cmd_array+=(-b /apex)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -126,12 +130,12 @@ start_audio() {
 
 launch_shell() {
     log "Starting Ubuntu shell..."
-    exec proot "${PROOT_ARGS[@]}" /bin/bash --login
+    exec "${cmd_array[@]}" /bin/bash --login
 }
 
 launch_command() {
     local cmd="$1"
-    exec proot "${PROOT_ARGS[@]}" /bin/bash -c "${cmd}"
+    exec "${cmd_array[@]}" /bin/bash -c "${cmd}"
 }
 
 launch_kde() {
@@ -142,7 +146,7 @@ launch_kde() {
     start_vnc "${resolution}"
     
     # Start KDE inside proot
-    proot "${PROOT_ARGS[@]}" /bin/bash -c "
+    "${cmd_array[@]}" /bin/bash -c "
         export DISPLAY=:1
         export XDG_RUNTIME_DIR=/tmp/runtime-root
         mkdir -p \$XDG_RUNTIME_DIR
@@ -178,7 +182,7 @@ launch_xfce() {
     start_vnc "${resolution}"
     
     # Start XFCE inside proot
-    proot "${PROOT_ARGS[@]}" /bin/bash -c "
+    "${cmd_array[@]}" /bin/bash -c "
         export DISPLAY=:1
         export XDG_RUNTIME_DIR=/tmp/runtime-root
         mkdir -p \$XDG_RUNTIME_DIR
